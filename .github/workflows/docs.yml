@@ -316,7 +316,7 @@ jobs:
           last_year=$((current_year - 1))
           
           old_years=()
-          for year in {2020..2023}; do
+          for ((year=2020; year<=last_year; year++)); do
             if find . -name "*.md" -not -path "./node_modules/*" -exec grep -l "$year" {} \; | head -1 >/dev/null; then
               old_years+=("$year")
             fi
