@@ -23,20 +23,26 @@ echo "Project: $PROJECT_TITLE"
 # Step 1: Create the project (try org-level first, fall back to user-level)
 echo "Creating project..."
 PROJECT_ID=""
-if gh project create --owner "$OWNER" --title "$PROJECT_TITLE" --body "$PROJECT_DESC" >/dev/null 2>&1; then
+ERR_FILE=$(mktemp)
+if gh project create --owner "$OWNER" --title "$PROJECT_TITLE" --body "$PROJECT_DESC" >/dev/null 2>"$ERR_FILE"; then
     echo "✓ Created org-level project: $PROJECT_TITLE"
     # Get the project ID - this is a bit tricky with gh CLI
     PROJECT_ID=$(gh project list --owner "$OWNER" --format json | jq -r ".[] | select(.title == \"$PROJECT_TITLE\") | .id" | head -1)
 else
     echo "⚠ Org-level project creation failed, trying user-level..."
-    if gh project create --title "$PROJECT_TITLE" --body "$PROJECT_DESC" >/dev/null 2>&1; then
+    if gh project create --title "$PROJECT_TITLE" --body "$PROJECT_DESC" >/dev/null 2>>"$ERR_FILE"; then
         echo "✓ Created user-level project: $PROJECT_TITLE"
         PROJECT_ID=$(gh project list --format json | jq -r ".[] | select(.title == \"$PROJECT_TITLE\") | .id" | head -1)
     else
         echo "❌ Failed to create project. Check permissions and try manually."
+        echo "---- Error output from gh CLI ----"
+        cat "$ERR_FILE"
+        echo "----------------------------------"
+        rm -f "$ERR_FILE"
         exit 1
     fi
 fi
+rm -f "$ERR_FILE"
 
 if [ -z "$PROJECT_ID" ]; then
     echo "❌ Could not determine project ID. Please check 'gh project list' and update script manually."
