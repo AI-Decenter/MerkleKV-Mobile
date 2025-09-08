@@ -1,0 +1,110 @@
+# This file defines code ownership for the MerkleKV Mobile repository
+# Each line is a file pattern followed by one or more owners
+# Owners can be GitHub usernames, email addresses, or team names
+
+# Global fallback - core team reviews everything by default
+* @AI-Decenter/merkle-kv-core
+
+# Core Engine & API
+/src/core/ @AI-Decenter/merkle-kv-core
+/src/api/ @AI-Decenter/merkle-kv-core
+/src/types/ @AI-Decenter/merkle-kv-core
+/src/utils/ @AI-Decenter/merkle-kv-core
+/src/errors/ @AI-Decenter/merkle-kv-core
+
+# MQTT Transport Layer
+/src/mqtt/ @AI-Decenter/merkle-kv-transport
+/src/transport/ @AI-Decenter/merkle-kv-transport
+/src/connection/ @AI-Decenter/merkle-kv-transport
+/src/protocols/ @AI-Decenter/merkle-kv-transport
+
+# Replication & Merkle Tree System
+/src/replication/ @AI-Decenter/merkle-kv-replication
+/src/merkle/ @AI-Decenter/merkle-kv-replication
+/src/consensus/ @AI-Decenter/merkle-kv-replication
+/src/vector-clock/ @AI-Decenter/merkle-kv-replication
+/src/conflict-resolution/ @AI-Decenter/merkle-kv-replication
+
+# Mobile Platform Integrations
+/src/mobile/ @AI-Decenter/merkle-kv-mobile
+/src/react-native/ @AI-Decenter/merkle-kv-mobile
+/android/ @AI-Decenter/merkle-kv-mobile
+/ios/ @AI-Decenter/merkle-kv-mobile
+
+# Storage & Persistence
+/src/storage/ @AI-Decenter/merkle-kv-storage
+/src/persistence/ @AI-Decenter/merkle-kv-storage
+/src/indexing/ @AI-Decenter/merkle-kv-storage
+
+# Security & Authentication
+/src/security/ @AI-Decenter/merkle-kv-security
+/src/auth/ @AI-Decenter/merkle-kv-security
+/src/acl/ @AI-Decenter/merkle-kv-security
+/src/encryption/ @AI-Decenter/merkle-kv-security
+
+# Performance & Optimization
+/src/performance/ @AI-Decenter/merkle-kv-performance
+/src/metrics/ @AI-Decenter/merkle-kv-performance
+/src/monitoring/ @AI-Decenter/merkle-kv-performance
+
+# Testing Infrastructure
+/tests/ @AI-Decenter/merkle-kv-testing
+/test/ @AI-Decenter/merkle-kv-testing
+/__tests__/ @AI-Decenter/merkle-kv-testing
+*.test.ts @AI-Decenter/merkle-kv-testing
+*.test.js @AI-Decenter/merkle-kv-testing
+*.spec.ts @AI-Decenter/merkle-kv-testing
+*.spec.js @AI-Decenter/merkle-kv-testing
+
+# Documentation
+/docs/ @AI-Decenter/merkle-kv-docs
+/documentation/ @AI-Decenter/merkle-kv-docs
+README.md @AI-Decenter/merkle-kv-docs
+CONTRIBUTING.md @AI-Decenter/merkle-kv-docs
+*.md @AI-Decenter/merkle-kv-docs
+
+# Infrastructure & DevOps
+/.github/ @AI-Decenter/merkle-kv-infra
+/scripts/ @AI-Decenter/merkle-kv-infra
+/tools/ @AI-Decenter/merkle-kv-infra
+Dockerfile @AI-Decenter/merkle-kv-infra
+docker-compose.yml @AI-Decenter/merkle-kv-infra
+.dockerignore @AI-Decenter/merkle-kv-infra
+
+# Build & Configuration
+package.json @AI-Decenter/merkle-kv-infra @AI-Decenter/merkle-kv-core
+package-lock.json @AI-Decenter/merkle-kv-infra
+yarn.lock @AI-Decenter/merkle-kv-infra
+tsconfig.json @AI-Decenter/merkle-kv-infra @AI-Decenter/merkle-kv-core
+webpack.config.js @AI-Decenter/merkle-kv-infra
+babel.config.js @AI-Decenter/merkle-kv-infra
+jest.config.js @AI-Decenter/merkle-kv-infra @AI-Decenter/merkle-kv-testing
+eslint.config.js @AI-Decenter/merkle-kv-infra
+.eslintrc* @AI-Decenter/merkle-kv-infra
+.prettierrc* @AI-Decenter/merkle-kv-infra
+
+# CI/CD Workflows
+/.github/workflows/ @AI-Decenter/merkle-kv-infra @AI-Decenter/merkle-kv-core
+/.github/actions/ @AI-Decenter/merkle-kv-infra
+
+# Security & Process Files
+SECURITY.md @AI-Decenter/merkle-kv-security @AI-Decenter/merkle-kv-core
+CODE_OF_CONDUCT.md @AI-Decenter/merkle-kv-core
+CODEOWNERS @AI-Decenter/merkle-kv-core
+
+# Issue & PR Templates
+/.github/ISSUE_TEMPLATE/ @AI-Decenter/merkle-kv-docs @AI-Decenter/merkle-kv-core
+/.github/PULL_REQUEST_TEMPLATE.md @AI-Decenter/merkle-kv-docs @AI-Decenter/merkle-kv-core
+
+# Release & Changelog
+CHANGELOG.md @AI-Decenter/merkle-kv-core
+RELEASE_PROCESS.md @AI-Decenter/merkle-kv-core @AI-Decenter/merkle-kv-infra
+
+# Environment & Secrets
+.env* @AI-Decenter/merkle-kv-security @AI-Decenter/merkle-kv-infra
+.gitignore @AI-Decenter/merkle-kv-infra
+
+# Examples & Demos
+/examples/ @AI-Decenter/merkle-kv-docs @AI-Decenter/merkle-kv-core
+/demo/ @AI-Decenter/merkle-kv-docs
+/samples/ @AI-Decenter/merkle-kv-docs

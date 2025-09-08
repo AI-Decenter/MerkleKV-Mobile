@@ -1,0 +1,141 @@
+# MerkleKV Mobile ACL File for Integration Testing
+# This file defines access control rules aligned with Locked Spec v1.0
+
+# Admin user (for testing and monitoring)
+user admin
+topic readwrite #
+
+# Test client user - basic operations
+user testuser
+# Allow read/write to own command and response topics
+topic readwrite merkle/testuser/cmd
+topic readwrite merkle/testuser/res
+# Allow read access to system status
+topic read $SYS/broker/load/+
+# Deny access to other clients' topics
+pattern read merkle/%u/cmd
+pattern read merkle/%u/res
+pattern write merkle/%u/cmd
+pattern write merkle/%u/res
+
+# Second test client user - for multi-client testing
+user testuser2
+# Allow read/write to own command and response topics
+topic readwrite merkle/testuser2/cmd
+topic readwrite merkle/testuser2/res
+# Allow read access to system status
+topic read $SYS/broker/load/+
+# Pattern-based access (only to own topics)
+pattern read merkle/%u/cmd
+pattern read merkle/%u/res
+pattern write merkle/%u/cmd
+pattern write merkle/%u/res
+
+# Replication node user - for Merkle tree replication
+user replication-node
+# Allow full access to replication topics per Locked Spec v1.0
+topic readwrite merkle/replication/events
+topic readwrite merkle/replication/sync
+topic readwrite merkle/replication/conflict
+# Allow read access to all client topics for replication purposes
+topic read merkle/+/cmd
+topic read merkle/+/res
+# Allow read access to system information
+topic read $SYS/broker/+
+topic read $SYS/broker/clients/+
+
+# Mobile client user - for React Native testing
+user mobile-client
+# Allow read/write to mobile-specific topics
+topic readwrite merkle/mobile-client/cmd
+topic readwrite merkle/mobile-client/res
+# Allow access to mobile-specific optimization topics
+topic readwrite merkle/mobile/heartbeat
+topic readwrite merkle/mobile/background
+# Pattern-based access for mobile clients
+pattern read merkle/mobile-%c/cmd
+pattern read merkle/mobile-%c/res
+pattern write merkle/mobile-%c/cmd
+pattern write merkle/mobile-%c/res
+
+# Performance testing user - for load testing
+user perf-test
+# Allow read/write to performance testing topics
+topic readwrite merkle/perf-test/cmd
+topic readwrite merkle/perf-test/res
+topic readwrite merkle/perf/+
+# Allow access to multiple test instances
+pattern readwrite merkle/perf-test-%c/cmd
+pattern readwrite merkle/perf-test-%c/res
+
+# Anonymous users (when allow_anonymous is true)
+# Default pattern for anonymous access (restricted)
+pattern read merkle/anonymous-%c/cmd
+pattern read merkle/anonymous-%c/res
+
+# Security testing user - for vulnerability testing
+user security-test
+# Restricted access for security testing
+topic read merkle/security-test/res
+# Explicitly deny write access to test security
+topic deny merkle/security-test/cmd
+
+# Integration testing user - for CI/CD testing
+user integration-test
+# Allow full access for integration testing
+topic readwrite merkle/integration/+
+topic readwrite merkle/test/+
+topic readwrite merkle/ci/+
+# Allow system monitoring
+topic read $SYS/broker/+
+
+# Backup/monitoring user - for operational monitoring
+user monitor
+# Read-only access to all topics for monitoring
+topic read merkle/+/+
+topic read merkle/replication/+
+topic read $SYS/+
+# Explicitly deny write access
+topic deny #
+
+# Topic Structure Validation Rules
+# Ensure compliance with Locked Spec v1.0 topic structure:
+# {prefix}/{client_id}/cmd
+# {prefix}/{client_id}/res  
+# {prefix}/replication/events
+
+# Global deny rules for non-compliant topic structures
+# Deny access to topics that don't follow the spec
+topic deny merkle/*/invalid
+topic deny merkle/wrong-structure/+
+topic deny non-merkle/+
+
+# Size limit enforcement (handled at broker level)
+# The broker configuration enforces:
+# - Key ≤ 256 bytes
+# - Value ≤ 256 KiB  
+# - Command ≤ 512 KiB
+
+# QoS and Retain enforcement (handled at application level)
+# All messages must use:
+# - QoS = 1 (exactly once delivery)
+# - retain = false (no message persistence)
+
+# Timeout and Backoff enforcement (handled at client level)
+# All connections must implement:
+# - Command timeout: 10 seconds
+# - Replication timeout: 20 seconds  
+# - Connection timeout: 30 seconds
+# - Reconnect backoff: 1→32 seconds with ±20% jitter
+
+# Test-specific patterns for integration testing
+# Allow test patterns for automated testing
+pattern readwrite test/%u/+
+pattern readwrite ci/%u/+
+pattern readwrite integration/%u/+
+
+# Deny patterns for security testing
+# Test unauthorized access prevention
+pattern deny restricted/+
+pattern deny admin/+
+pattern deny system/+

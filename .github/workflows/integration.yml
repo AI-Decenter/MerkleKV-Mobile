@@ -1,0 +1,412 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run integration tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        tls: [true, false]
+        acl: [true, false]
+        include:
+          - tls: true
+            acl: true
+            name: "TLS + ACL"
+            port: 8883
+            protocol: "mqtts"
+          - tls: true
+            acl: false
+            name: "TLS only"
+            port: 8883
+            protocol: "mqtts"
+          - tls: false
+            acl: true
+            name: "ACL only"
+            port: 1883
+            protocol: "mqtt"
+          - tls: false
+            acl: false
+            name: "Plain MQTT"
+            port: 1883
+            protocol: "mqtt"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-integration-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-integration-
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate TLS certificates
+        if: matrix.tls == true
+        run: |
+          mkdir -p ci/certs
+          cd ci/certs
+          
+          # Generate CA private key
+          openssl genrsa -out ca.key 2048
+          
+          # Generate CA certificate
+          openssl req -new -x509 -days 30 -key ca.key -out ca.crt -subj "/CN=Test CA"
+          
+          # Generate server private key
+          openssl genrsa -out server.key 2048
+          
+          # Generate server certificate signing request
+          openssl req -new -key server.key -out server.csr -subj "/CN=localhost"
+          
+          # Generate server certificate
+          openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 30
+          
+          # Generate client private key
+          openssl genrsa -out client.key 2048
+          
+          # Generate client certificate signing request
+          openssl req -new -key client.key -out client.csr -subj "/CN=testclient"
+          
+          # Generate client certificate
+          openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 30
+          
+          # Set permissions
+          chmod 644 *.crt
+          chmod 600 *.key
+          
+          echo "✅ TLS certificates generated"
+
+      - name: Prepare Mosquitto configuration
+        run: |
+          # Copy base configuration
+          cp ci/mosquitto.conf mosquitto-test.conf
+          
+          # Configure for TLS if enabled
+          if [ "${{ matrix.tls }}" = "true" ]; then
+            echo "" >> mosquitto-test.conf
+            echo "# TLS Configuration" >> mosquitto-test.conf
+            echo "listener 8883" >> mosquitto-test.conf
+            echo "cafile /mosquitto/config/certs/ca.crt" >> mosquitto-test.conf
+            echo "certfile /mosquitto/config/certs/server.crt" >> mosquitto-test.conf
+            echo "keyfile /mosquitto/config/certs/server.key" >> mosquitto-test.conf
+            echo "require_certificate false" >> mosquitto-test.conf
+            echo "use_identity_as_username false" >> mosquitto-test.conf
+          fi
+          
+          # Configure for ACL if enabled
+          if [ "${{ matrix.acl }}" = "true" ]; then
+            echo "" >> mosquitto-test.conf
+            echo "# ACL Configuration" >> mosquitto-test.conf
+            echo "acl_file /mosquitto/config/aclfile" >> mosquitto-test.conf
+            echo "allow_anonymous false" >> mosquitto-test.conf
+            echo "password_file /mosquitto/config/passwordfile" >> mosquitto-test.conf
+          else
+            echo "allow_anonymous true" >> mosquitto-test.conf
+          fi
+          
+          echo "✅ Mosquitto configuration prepared for ${{ matrix.name }}"
+
+      - name: Create password file for ACL testing
+        if: matrix.acl == true
+        run: |
+          # Create mosquitto password file
+          docker run --rm -v $(pwd):/data eclipse-mosquitto:latest mosquitto_passwd -c -b /data/passwordfile testuser testpass
+          docker run --rm -v $(pwd):/data eclipse-mosquitto:latest mosquitto_passwd -b /data/passwordfile testuser2 testpass2
+          docker run --rm -v $(pwd):/data eclipse-mosquitto:latest mosquitto_passwd -b /data/passwordfile replication-node replpass
+          
+          echo "✅ Password file created for ACL testing"
+
+      - name: Start Mosquitto broker
+        run: |
+          # Start Mosquitto in Docker with appropriate configuration
+          docker run -d \
+            --name mosquitto-test \
+            -p ${{ matrix.port }}:${{ matrix.port }} \
+            -v $(pwd)/mosquitto-test.conf:/mosquitto/config/mosquitto.conf \
+            -v $(pwd)/ci/aclfile:/mosquitto/config/aclfile \
+            -v $(pwd)/passwordfile:/mosquitto/config/passwordfile \
+            $(if [ "${{ matrix.tls }}" = "true" ]; then echo "-v $(pwd)/ci/certs:/mosquitto/config/certs"; fi) \
+            eclipse-mosquitto:latest
+          
+          # Wait for broker to be ready
+          sleep 5
+          
+          # Test broker connectivity
+          if [ "${{ matrix.tls }}" = "true" ]; then
+            docker run --rm --network host \
+              -v $(pwd)/ci/certs:/certs \
+              eclipse-mosquitto:latest \
+              mosquitto_pub -h localhost -p ${{ matrix.port }} \
+              --cafile /certs/ca.crt \
+              -t test/startup -m "broker_ready" -q 1
+          else
+            docker run --rm --network host \
+              eclipse-mosquitto:latest \
+              mosquitto_pub -h localhost -p ${{ matrix.port }} \
+              -t test/startup -m "broker_ready" -q 1 \
+              $(if [ "${{ matrix.acl }}" = "true" ]; then echo "-u testuser -P testpass"; fi)
+          fi
+          
+          echo "✅ Mosquitto broker started and verified (${{ matrix.name }})"
+
+      - name: Run Locked Spec v1.0 compliance tests
+        run: |
+          echo "🔒 Running Locked Spec v1.0 compliance tests..."
+          
+          # Test QoS=1 requirement
+          npm run test:integration:qos -- --reporter=verbose
+          
+          # Test retain=false requirement
+          npm run test:integration:retain -- --reporter=verbose
+          
+          # Test topic structure compliance
+          npm run test:integration:topics -- --reporter=verbose
+          
+          # Test size limits
+          npm run test:integration:sizes -- --reporter=verbose
+          
+          # Test timeout behavior
+          npm run test:integration:timeouts -- --reporter=verbose
+          
+          echo "✅ Locked Spec v1.0 compliance tests passed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: ${{ matrix.protocol }}://localhost:${{ matrix.port }}
+          MQTT_TLS_ENABLED: ${{ matrix.tls }}
+          MQTT_ACL_ENABLED: ${{ matrix.acl }}
+          MQTT_CA_FILE: ${{ matrix.tls == true && 'ci/certs/ca.crt' || '' }}
+          MQTT_TEST_USER: ${{ matrix.acl == true && 'testuser' || '' }}
+          MQTT_TEST_PASS: ${{ matrix.acl == true && 'testpass' || '' }}
+
+      - name: Run TLS security tests
+        if: matrix.tls == true
+        run: |
+          echo "🔐 Running TLS security tests..."
+          
+          # Test TLS 1.2+ requirement
+          npm run test:integration:tls -- --reporter=verbose
+          
+          # Test certificate validation
+          npm run test:integration:certs -- --reporter=verbose
+          
+          # Test secure connection establishment
+          npm run test:integration:secure-connect -- --reporter=verbose
+          
+          echo "✅ TLS security tests passed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: ${{ matrix.protocol }}://localhost:${{ matrix.port }}
+          MQTT_CA_FILE: ci/certs/ca.crt
+          MQTT_CLIENT_CERT: ci/certs/client.crt
+          MQTT_CLIENT_KEY: ci/certs/client.key
+
+      - name: Run ACL authorization tests
+        if: matrix.acl == true
+        run: |
+          echo "🔒 Running ACL authorization tests..."
+          
+          # Test topic access control
+          npm run test:integration:acl -- --reporter=verbose
+          
+          # Test user permissions
+          npm run test:integration:permissions -- --reporter=verbose
+          
+          # Test unauthorized access prevention
+          npm run test:integration:unauthorized -- --reporter=verbose
+          
+          echo "✅ ACL authorization tests passed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: ${{ matrix.protocol }}://localhost:${{ matrix.port }}
+          MQTT_TEST_USER: testuser
+          MQTT_TEST_PASS: testpass
+          MQTT_TEST_USER2: testuser2
+          MQTT_TEST_PASS2: testpass2
+
+      - name: Run replication integration tests
+        run: |
+          echo "🔄 Running replication integration tests..."
+          
+          # Test Merkle tree replication
+          npm run test:integration:replication -- --reporter=verbose
+          
+          # Test vector clock synchronization
+          npm run test:integration:vector-clock -- --reporter=verbose
+          
+          # Test conflict resolution (LWW)
+          npm run test:integration:conflict-resolution -- --reporter=verbose
+          
+          # Test multi-node scenarios
+          npm run test:integration:multi-node -- --reporter=verbose
+          
+          echo "✅ Replication integration tests passed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: ${{ matrix.protocol }}://localhost:${{ matrix.port }}
+          MQTT_REPLICATION_USER: ${{ matrix.acl == true && 'replication-node' || '' }}
+          MQTT_REPLICATION_PASS: ${{ matrix.acl == true && 'replpass' || '' }}
+
+      - name: Run mobile platform integration tests
+        run: |
+          echo "📱 Running mobile platform integration tests..."
+          
+          # Test React Native bridge integration
+          npm run test:integration:mobile -- --reporter=verbose
+          
+          # Test background/foreground behavior
+          npm run test:integration:lifecycle -- --reporter=verbose
+          
+          # Test network connectivity changes
+          npm run test:integration:network -- --reporter=verbose
+          
+          echo "✅ Mobile platform integration tests passed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: ${{ matrix.protocol }}://localhost:${{ matrix.port }}
+
+      - name: Run performance integration tests
+        run: |
+          echo "⚡ Running performance integration tests..."
+          
+          # Test throughput with size limits
+          npm run test:integration:throughput -- --reporter=verbose
+          
+          # Test memory usage under load
+          npm run test:integration:memory -- --reporter=verbose
+          
+          # Test connection stability
+          npm run test:integration:stability -- --reporter=verbose
+          
+          echo "✅ Performance integration tests passed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: ${{ matrix.protocol }}://localhost:${{ matrix.port }}
+
+      - name: Validate failure scenarios
+        run: |
+          echo "❌ Testing failure scenarios..."
+          
+          # Test connection failures
+          npm run test:integration:failures -- --reporter=verbose
+          
+          # Test broker disconnection handling
+          npm run test:integration:disconnection -- --reporter=verbose
+          
+          # Test malformed message handling
+          npm run test:integration:malformed -- --reporter=verbose
+          
+          echo "✅ Failure scenario tests passed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: ${{ matrix.protocol }}://localhost:${{ matrix.port }}
+
+      - name: Collect broker logs
+        if: always()
+        run: |
+          echo "📋 Collecting Mosquitto broker logs..."
+          docker logs mosquitto-test > mosquitto-logs-${{ matrix.name }}.txt 2>&1 || true
+          
+          # Show recent logs for debugging
+          echo "Recent broker logs:"
+          tail -50 mosquitto-logs-${{ matrix.name }}.txt || true
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-artifacts-${{ matrix.name }}
+          path: |
+            mosquitto-logs-*.txt
+            mosquitto-test.conf
+            passwordfile
+            ci/certs/
+            test-results/
+          retention-days: 7
+
+      - name: Stop Mosquitto broker
+        if: always()
+        run: |
+          docker stop mosquitto-test || true
+          docker rm mosquitto-test || true
+
+      - name: Generate integration test summary
+        if: always()
+        run: |
+          echo "## 🔗 Integration Test Results (${{ matrix.name }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Configuration**: TLS=${{ matrix.tls }}, ACL=${{ matrix.acl }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Broker**: Mosquitto (latest)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Protocol**: ${{ matrix.protocol }}://:${{ matrix.port }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Categories" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Locked Spec v1.0 compliance" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔄 Replication and conflict resolution" >> $GITHUB_STEP_SUMMARY
+          echo "- 📱 Mobile platform integration" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚡ Performance and stability" >> $GITHUB_STEP_SUMMARY
+          echo "- ❌ Failure scenario handling" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ matrix.tls }}" = "true" ]; then
+            echo "- 🔐 TLS security validation" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ matrix.acl }}" = "true" ]; then
+            echo "- 🔒 ACL authorization testing" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  integration-summary:
+    name: Integration Test Summary
+    runs-on: ubuntu-latest
+    needs: integration
+    if: always()
+    
+    steps:
+      - name: Check integration test results
+        run: |
+          if [ "${{ needs.integration.result }}" = "failure" ]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          elif [ "${{ needs.integration.result }}" = "cancelled" ]; then
+            echo "⚠️ Integration tests were cancelled"
+            exit 1
+          else
+            echo "✅ All integration tests passed successfully"
+          fi
+
+      - name: Generate final integration summary
+        run: |
+          echo "## 🎯 Final Integration Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ needs.integration.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Configurations tested**: 4 (TLS+ACL, TLS-only, ACL-only, Plain)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Broker**: Mosquitto (latest)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Spec compliance**: Locked Spec v1.0 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security**: TLS 1.2+ and ACL validation ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mobile**: React Native integration ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Performance**: Throughput and stability ✅" >> $GITHUB_STEP_SUMMARY

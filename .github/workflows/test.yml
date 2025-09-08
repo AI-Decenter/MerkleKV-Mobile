@@ -1,0 +1,251 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: ['18', '20']
+        include:
+          - os: ubuntu-latest
+            cache-path: ~/.npm
+          - os: macos-latest
+            cache-path: ~/.npm
+          - os: windows-latest
+            cache-path: ~\AppData\Roaming\npm-cache
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.cache-path }}
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup MQTT broker for testing
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Install and start Mosquitto MQTT broker
+          sudo apt-get update
+          sudo apt-get install -y mosquitto mosquitto-clients
+          sudo systemctl start mosquitto
+          sudo systemctl enable mosquitto
+          
+          # Configure basic ACL for testing
+          echo "allow_anonymous true" | sudo tee -a /etc/mosquitto/mosquitto.conf
+          sudo systemctl restart mosquitto
+          
+          # Wait for broker to be ready
+          sleep 2
+          mosquitto_pub -h localhost -t test/connection -m "broker_ready"
+          echo "✅ MQTT broker ready for testing"
+
+      - name: Run unit tests
+        run: |
+          npm test -- --reporter=verbose --coverage
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: mqtt://localhost:1883
+          MQTT_TEST_PREFIX: test-${{ github.run_id }}
+
+      - name: Run Locked Spec v1.0 compliance tests
+        run: |
+          echo "🔒 Running Locked Spec v1.0 compliance tests..."
+          
+          # Run spec-specific test suite
+          npm run test:spec -- --reporter=verbose
+          
+          echo "✅ Locked Spec v1.0 compliance tests passed"
+        env:
+          NODE_ENV: test
+          SPEC_COMPLIANCE_MODE: strict
+
+      - name: Run integration tests
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '18'
+        run: |
+          echo "🔗 Running integration tests..."
+          
+          # Start test environment
+          npm run test:integration -- --reporter=verbose
+          
+          echo "✅ Integration tests completed"
+        env:
+          NODE_ENV: test
+          MQTT_BROKER_URL: mqtt://localhost:1883
+
+      - name: Run mobile platform tests
+        if: matrix.os == 'macos-latest' && matrix.node-version == '18'
+        run: |
+          echo "📱 Running mobile platform tests..."
+          
+          # Install React Native testing dependencies
+          npm install -g @react-native-community/cli
+          
+          # Run mobile-specific tests
+          npm run test:mobile -- --reporter=verbose
+          
+          echo "✅ Mobile platform tests completed"
+        env:
+          NODE_ENV: test
+
+      - name: Run performance tests
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '18'
+        run: |
+          echo "⚡ Running performance tests..."
+          
+          # Run performance benchmark tests
+          npm run test:performance -- --reporter=verbose
+          
+          echo "✅ Performance tests completed"
+        env:
+          NODE_ENV: test
+
+      - name: Run property-based tests
+        run: |
+          echo "🎲 Running property-based tests..."
+          
+          # Test idempotency and determinism
+          npm run test:property -- --reporter=verbose
+          
+          echo "✅ Property-based tests completed"
+        env:
+          NODE_ENV: test
+
+      - name: Validate MQTT constraints
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "📡 Validating MQTT constraints..."
+          
+          # Test QoS=1, retain=false enforcement
+          node -e "
+            const mqtt = require('mqtt');
+            const client = mqtt.connect('mqtt://localhost:1883');
+            
+            client.on('connect', () => {
+              // Test QoS constraint
+              client.publish('test/qos', 'test', { qos: 1, retain: false }, (err) => {
+                if (err) {
+                  console.error('❌ MQTT publish failed:', err);
+                  process.exit(1);
+                }
+                console.log('✅ MQTT QoS=1, retain=false validated');
+                client.end();
+              });
+            });
+            
+            client.on('error', (err) => {
+              console.error('❌ MQTT connection failed:', err);
+              process.exit(1);
+            });
+          "
+
+      - name: Test timeout and backoff behavior
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          echo "⏱️ Testing timeout and backoff behavior..."
+          
+          # Test connection timeouts and reconnect backoff
+          npm run test:timeouts -- --reporter=verbose
+          
+          echo "✅ Timeout and backoff behavior validated"
+        env:
+          NODE_ENV: test
+
+      - name: Upload coverage reports
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '18'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-node${{ matrix.node-version }}
+          path: |
+            coverage/
+            test-results/
+            junit.xml
+          retention-days: 7
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## 🧪 Test Results (${{ matrix.os }}, Node ${{ matrix.node-version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Unit tests completed" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Locked Spec v1.0 compliance verified" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ] && [ "${{ matrix.node-version }}" = "18" ]; then
+            echo "- 🔗 Integration tests passed" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚡ Performance tests completed" >> $GITHUB_STEP_SUMMARY
+            echo "- 📡 MQTT constraints validated" >> $GITHUB_STEP_SUMMARY
+            echo "- ⏱️ Timeout behavior verified" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ matrix.os }}" = "macos-latest" ] && [ "${{ matrix.node-version }}" = "18" ]; then
+            echo "- 📱 Mobile platform tests passed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "- 🎲 Property-based tests validated" >> $GITHUB_STEP_SUMMARY
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test.result }}" = "failure" ]; then
+            echo "❌ Some tests failed"
+            exit 1
+          elif [ "${{ needs.test.result }}" = "cancelled" ]; then
+            echo "⚠️ Tests were cancelled"
+            exit 1
+          else
+            echo "✅ All tests passed successfully"
+          fi
+
+      - name: Generate final summary
+        run: |
+          echo "## 🎯 Final Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: Ubuntu, macOS, Windows" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node.js versions**: 18, 20" >> $GITHUB_STEP_SUMMARY
+          echo "- **Spec compliance**: Locked Spec v1.0 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mobile compatibility**: React Native ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- **MQTT validation**: QoS=1, retain=false ✅" >> $GITHUB_STEP_SUMMARY

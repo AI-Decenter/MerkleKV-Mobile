@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 General Discussion
+    url: https://github.com/AI-Decenter/MerkleKV-Mobile/discussions
+    about: Ask questions, share ideas, or discuss the project with the community
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/AI-Decenter/MerkleKV-Mobile/security/advisories/new
+    about: Report security vulnerabilities privately (do not create public issues)
+  - name: 📚 Documentation
+    url: https://docs.ai-decenter.org/merkle-kv-mobile
+    about: Browse the official documentation and guides
+  - name: 📊 Project Roadmap
+    url: https://github.com/orgs/AI-Decenter/projects
+    about: View the development roadmap and project status

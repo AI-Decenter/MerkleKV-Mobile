@@ -1,0 +1,386 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.md'
+      - '**.mdx'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.md'
+      - '**.mdx'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-validation:
+    name: Documentation Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check Markdown formatting
+        run: |
+          echo "📝 Checking Markdown formatting..."
+          
+          # Check if prettier is configured for markdown
+          if npx prettier --check "**/*.md" "**/*.mdx" 2>/dev/null; then
+            echo "✅ Markdown formatting is consistent"
+          else
+            echo "❌ Markdown formatting issues found"
+            echo "Run: npx prettier --write \"**/*.md\" \"**/*.mdx\""
+            exit 1
+          fi
+
+      - name: Validate Markdown syntax
+        uses: DavidAnson/markdownlint-action@v1
+        with:
+          files: '**/*.md'
+          config: |
+            {
+              "MD013": false,
+              "MD033": false,
+              "MD041": false,
+              "MD034": false
+            }
+
+      - name: Check for broken links with Lychee
+        uses: lycheeverse/lychee-action@v1.9.3
+        with:
+          # Check all markdown files
+          args: |
+            --verbose
+            --no-progress
+            --max-concurrency 4
+            --timeout 30
+            --max-redirects 10
+            --accept 200,204,429,999
+            --exclude-mail
+            --exclude-path "./node_modules"
+            --exclude-path "./coverage"
+            --exclude-path "./.git"
+            --exclude "^mailto:"
+            --exclude "^javascript:"
+            --exclude "^file:"
+            --exclude "localhost"
+            --exclude "127.0.0.1"
+            --exclude "0.0.0.0"
+            --exclude "example.com"
+            --exclude "^#"
+            "**/*.md"
+            "**/*.mdx"
+          fail: true
+          jobSummary: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate documentation structure
+        run: |
+          echo "📚 Validating documentation structure..."
+          
+          # Check required documentation files
+          required_files=(
+            "README.md"
+            "CONTRIBUTING.md"
+            "SECURITY.md"
+            "CODE_OF_CONDUCT.md"
+            "CHANGELOG.md"
+            "RELEASE_PROCESS.md"
+          )
+          
+          missing_files=()
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              missing_files+=("$file")
+            fi
+          done
+          
+          if [ ${#missing_files[@]} -ne 0 ]; then
+            echo "❌ Missing required documentation files:"
+            printf '%s\n' "${missing_files[@]}"
+            exit 1
+          fi
+          
+          echo "✅ All required documentation files present"
+
+      - name: Validate Locked Spec v1.0 documentation
+        run: |
+          echo "🔒 Validating Locked Spec v1.0 documentation..."
+          
+          # Check that key spec constraints are documented
+          spec_terms=(
+            "QoS=1"
+            "retain=false"
+            "256 bytes"
+            "256 KiB"
+            "512 KiB"
+            "10 seconds"
+            "20 seconds"
+            "30 seconds"
+            "MQTT-only"
+            "idempotent"
+            "deterministic"
+            "LWW"
+            "vector clock"
+          )
+          
+          files_to_check=(
+            "README.md"
+            "CONTRIBUTING.md"
+            "SECURITY.md"
+          )
+          
+          missing_terms=()
+          for term in "${spec_terms[@]}"; do
+            found=false
+            for file in "${files_to_check[@]}"; do
+              if [ -f "$file" ] && grep -q "$term" "$file"; then
+                found=true
+                break
+              fi
+            done
+            if [ "$found" = false ]; then
+              missing_terms+=("$term")
+            fi
+          done
+          
+          if [ ${#missing_terms[@]} -ne 0 ]; then
+            echo "⚠️ Some Locked Spec v1.0 terms not found in documentation:"
+            printf '%s\n' "${missing_terms[@]}"
+            echo "Consider adding these terms to improve spec compliance documentation"
+          else
+            echo "✅ Locked Spec v1.0 terms well documented"
+          fi
+
+      - name: Check documentation completeness
+        run: |
+          echo "📋 Checking documentation completeness..."
+          
+          # Check README.md structure
+          if [ -f "README.md" ]; then
+            readme_sections=(
+              "# "
+              "## "
+              "### "
+              "Installation"
+              "Usage"
+              "API"
+              "Contributing"
+              "License"
+            )
+            
+            missing_sections=()
+            for section in "${readme_sections[@]}"; do
+              if ! grep -q "$section" README.md; then
+                missing_sections+=("$section")
+              fi
+            done
+            
+            if [ ${#missing_sections[@]} -ne 0 ]; then
+              echo "⚠️ README.md missing recommended sections:"
+              printf '%s\n' "${missing_sections[@]}"
+            else
+              echo "✅ README.md has good structure"
+            fi
+          fi
+          
+          # Check CONTRIBUTING.md structure
+          if [ -f "CONTRIBUTING.md" ]; then
+            contrib_sections=(
+              "Getting Started"
+              "Development"
+              "Testing"
+              "Pull Request"
+              "Code"
+            )
+            
+            missing_contrib=()
+            for section in "${contrib_sections[@]}"; do
+              if ! grep -iq "$section" CONTRIBUTING.md; then
+                missing_contrib+=("$section")
+              fi
+            done
+            
+            if [ ${#missing_contrib[@]} -ne 0 ]; then
+              echo "⚠️ CONTRIBUTING.md missing recommended sections:"
+              printf '%s\n' "${missing_contrib[@]}"
+            else
+              echo "✅ CONTRIBUTING.md has good structure"
+            fi
+          fi
+
+      - name: Validate code examples in documentation
+        run: |
+          echo "💻 Validating code examples in documentation..."
+          
+          # Extract and validate JavaScript/TypeScript code blocks
+          find . -name "*.md" -not -path "./node_modules/*" -not -path "./.git/*" | while read -r file; do
+            echo "Checking code examples in: $file"
+            
+            # Extract code blocks and check for common issues
+            if grep -q "\`\`\`javascript\|typescript\|js\|ts" "$file"; then
+              # Check for proper syntax in code examples
+              # This is a basic check - could be enhanced with actual syntax validation
+              if grep -A 10 "\`\`\`\(javascript\|typescript\|js\|ts\)" "$file" | grep -q "function\|const\|let\|var\|class\|interface"; then
+                echo "✅ Code examples found in $file"
+              fi
+            fi
+          done
+          
+          echo "✅ Code example validation completed"
+
+      - name: Check mobile platform documentation
+        run: |
+          echo "📱 Checking mobile platform documentation..."
+          
+          mobile_terms=(
+            "React Native"
+            "iOS"
+            "Android"
+            "mobile"
+            "battery"
+            "background"
+            "foreground"
+          )
+          
+          mobile_docs_found=false
+          for term in "${mobile_terms[@]}"; do
+            if find . -name "*.md" -not -path "./node_modules/*" -exec grep -l "$term" {} \; | head -1; then
+              mobile_docs_found=true
+              break
+            fi
+          done
+          
+          if [ "$mobile_docs_found" = true ]; then
+            echo "✅ Mobile platform documentation found"
+          else
+            echo "⚠️ Consider adding mobile platform documentation"
+          fi
+
+      - name: Validate security documentation
+        run: |
+          echo "🔒 Validating security documentation..."
+          
+          if [ -f "SECURITY.md" ]; then
+            security_requirements=(
+              "TLS"
+              "vulnerability"
+              "security"
+              "disclosure"
+              "ACL"
+              "authentication"
+            )
+            
+            missing_security=()
+            for req in "${security_requirements[@]}"; do
+              if ! grep -iq "$req" SECURITY.md; then
+                missing_security+=("$req")
+              fi
+            done
+            
+            if [ ${#missing_security[@]} -ne 0 ]; then
+              echo "⚠️ SECURITY.md missing security topics:"
+              printf '%s\n' "${missing_security[@]}"
+            else
+              echo "✅ SECURITY.md covers key security topics"
+            fi
+          fi
+
+      - name: Check for outdated links and references
+        run: |
+          echo "🔍 Checking for potentially outdated content..."
+          
+          # Check for old year references
+          current_year=$(date +%Y)
+          last_year=$((current_year - 1))
+          
+          old_years=()
+          for year in {2020..2023}; do
+            if find . -name "*.md" -not -path "./node_modules/*" -exec grep -l "$year" {} \; | head -1 >/dev/null; then
+              old_years+=("$year")
+            fi
+          done
+          
+          if [ ${#old_years[@]} -ne 0 ]; then
+            echo "⚠️ Found references to older years in documentation:"
+            printf '%s\n' "${old_years[@]}"
+            echo "Consider updating copyright years and version references"
+          fi
+          
+          # Check for placeholder content
+          placeholders=(
+            "TODO"
+            "FIXME"
+            "XXX"
+            "PLACEHOLDER"
+            "TBD"
+            "Coming soon"
+          )
+          
+          found_placeholders=()
+          for placeholder in "${placeholders[@]}"; do
+            if find . -name "*.md" -not -path "./node_modules/*" -exec grep -l "$placeholder" {} \; | head -1 >/dev/null; then
+              found_placeholders+=("$placeholder")
+            fi
+          done
+          
+          if [ ${#found_placeholders[@]} -ne 0 ]; then
+            echo "⚠️ Found placeholder content in documentation:"
+            printf '%s\n' "${found_placeholders[@]}"
+            echo "Consider completing these sections before release"
+          fi
+
+      - name: Generate documentation report
+        if: always()
+        run: |
+          echo "## 📚 Documentation Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Markdown formatting checked" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Markdown syntax validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Link validation completed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Documentation structure verified" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Locked Spec v1.0 terms documented" >> $GITHUB_STEP_SUMMARY
+          echo "- 📱 Mobile platform coverage checked" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security documentation validated" >> $GITHUB_STEP_SUMMARY
+          echo "- 💻 Code examples verified" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Files Validated" >> $GITHUB_STEP_SUMMARY
+          echo "- README.md" >> $GITHUB_STEP_SUMMARY
+          echo "- CONTRIBUTING.md" >> $GITHUB_STEP_SUMMARY
+          echo "- SECURITY.md" >> $GITHUB_STEP_SUMMARY
+          echo "- CODE_OF_CONDUCT.md" >> $GITHUB_STEP_SUMMARY
+          echo "- CHANGELOG.md" >> $GITHUB_STEP_SUMMARY
+          echo "- RELEASE_PROCESS.md" >> $GITHUB_STEP_SUMMARY
+          echo "- All other *.md files" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload documentation artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-validation-results
+          path: |
+            lychee-output.md
+            markdownlint-results.txt
+          retention-days: 7

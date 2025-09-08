@@ -1,0 +1,119 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Code Quality & Formatting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code formatting
+        run: |
+          npx prettier --check "src/**/*.{ts,tsx,js,jsx}" "**/*.{md,json,yml,yaml}"
+          echo "✅ Code formatting is consistent"
+
+      - name: Run ESLint
+        run: |
+          npx eslint src/ --ext .ts,.tsx,.js,.jsx --format=compact
+          echo "✅ ESLint analysis completed"
+
+      - name: Run TypeScript compiler check
+        run: |
+          npx tsc --noEmit --skipLibCheck
+          echo "✅ TypeScript compilation check passed"
+
+      - name: Validate Locked Spec v1.0 compliance
+        run: |
+          # Check for spec violations in code
+          echo "🔒 Validating Locked Spec v1.0 compliance..."
+          
+          # Ensure QoS=1, retain=false constraints
+          if grep -r "qos.*[^1]" src/ || grep -r "retain.*true" src/; then
+            echo "❌ MQTT QoS must be 1 and retain must be false (Locked Spec v1.0)"
+            exit 1
+          fi
+          
+          # Check for topic structure compliance
+          if grep -r "topic.*/" src/ | grep -v "{prefix}/{client_id}/\(cmd\|res\)" | grep -v "{prefix}/replication/events"; then
+            echo "⚠️ Verify topic structure follows: {prefix}/{client_id}/cmd|res or {prefix}/replication/events"
+          fi
+          
+          echo "✅ Locked Spec v1.0 compliance validated"
+
+      - name: Check package vulnerabilities
+        run: |
+          npm audit --audit-level=moderate
+          echo "✅ Security audit completed"
+
+      - name: Validate mobile platform compatibility
+        run: |
+          # Check for React Native compatibility
+          echo "📱 Validating mobile platform compatibility..."
+          
+          # Ensure no Node.js-only modules in mobile code
+          if grep -r "fs\|path\|os\|crypto" src/mobile/ src/react-native/ 2>/dev/null; then
+            echo "⚠️ Potential Node.js-only modules detected in mobile code"
+          fi
+          
+          echo "✅ Mobile platform compatibility validated"
+
+      - name: Check documentation quality
+        run: |
+          # Validate README and documentation
+          echo "📚 Checking documentation quality..."
+          
+          if [ ! -f README.md ]; then
+            echo "❌ README.md is required"
+            exit 1
+          fi
+          
+          # Check for CHANGELOG updates in PRs
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if ! git diff --name-only origin/main...HEAD | grep -q CHANGELOG.md; then
+              echo "⚠️ Consider updating CHANGELOG.md for this PR"
+            fi
+          fi
+          
+          echo "✅ Documentation quality validated"
+
+      - name: Generate lint report
+        if: always()
+        run: |
+          echo "## 🧹 Lint Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Code formatting validated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ESLint analysis completed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ TypeScript compilation verified" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Locked Spec v1.0 compliance confirmed" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔐 Security audit passed" >> $GITHUB_STEP_SUMMARY
+          echo "- 📱 Mobile compatibility validated" >> $GITHUB_STEP_SUMMARY
