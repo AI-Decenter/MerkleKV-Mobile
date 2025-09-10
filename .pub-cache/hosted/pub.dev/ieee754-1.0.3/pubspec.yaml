@@ -1,0 +1,16 @@
+name: ieee754
+description: A library for parsing and encoding IEEE-754 binary floating point numbers.
+version: 1.0.3
+homepage: https://github.com/nicbn/ieee754-dart
+repository: https://github.com/nicbn/ieee754-dart
+
+environment:
+  sdk: '>=2.14.4 <3.0.0'
+
+dependencies:
+  meta: ^1.7.0
+
+dev_dependencies:
+  convert: ^3.0.1
+  lints: ^1.0.0
+  test: ^1.19.4

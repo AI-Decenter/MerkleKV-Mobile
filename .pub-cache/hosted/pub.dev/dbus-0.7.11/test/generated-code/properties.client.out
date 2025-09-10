@@ -1,0 +1,193 @@
+import 'dart:io';
+import 'package:dbus/dbus.dart';
+
+class ComExampleTest extends DBusRemoteObject {
+  ComExampleTest(DBusClient client, String destination, DBusObjectPath path) : super(client, name: destination, path: path);
+
+  /// Gets com.example.Test.ByteProperty
+  Future<int> getByteProperty() async {
+    var value = await getProperty('com.example.Test', 'ByteProperty', signature: DBusSignature('y'));
+    return value.asByte();
+  }
+
+  /// Sets com.example.Test.ByteProperty
+  Future<void> setByteProperty (int value) async {
+    await setProperty('com.example.Test', 'ByteProperty', DBusByte(value));
+  }
+
+  /// Gets com.example.Test.BooleanProperty
+  Future<bool> getBooleanProperty() async {
+    var value = await getProperty('com.example.Test', 'BooleanProperty', signature: DBusSignature('b'));
+    return value.asBoolean();
+  }
+
+  /// Sets com.example.Test.BooleanProperty
+  Future<void> setBooleanProperty (bool value) async {
+    await setProperty('com.example.Test', 'BooleanProperty', DBusBoolean(value));
+  }
+
+  /// Gets com.example.Test.Int16Property
+  Future<int> getInt16Property() async {
+    var value = await getProperty('com.example.Test', 'Int16Property', signature: DBusSignature('n'));
+    return value.asInt16();
+  }
+
+  /// Sets com.example.Test.Int16Property
+  Future<void> setInt16Property (int value) async {
+    await setProperty('com.example.Test', 'Int16Property', DBusInt16(value));
+  }
+
+  /// Gets com.example.Test.Uint16Property
+  Future<int> getUint16Property() async {
+    var value = await getProperty('com.example.Test', 'Uint16Property', signature: DBusSignature('q'));
+    return value.asUint16();
+  }
+
+  /// Sets com.example.Test.Uint16Property
+  Future<void> setUint16Property (int value) async {
+    await setProperty('com.example.Test', 'Uint16Property', DBusUint16(value));
+  }
+
+  /// Gets com.example.Test.Int32Property
+  Future<int> getInt32Property() async {
+    var value = await getProperty('com.example.Test', 'Int32Property', signature: DBusSignature('i'));
+    return value.asInt32();
+  }
+
+  /// Sets com.example.Test.Int32Property
+  Future<void> setInt32Property (int value) async {
+    await setProperty('com.example.Test', 'Int32Property', DBusInt32(value));
+  }
+
+  /// Gets com.example.Test.Uint32Property
+  Future<int> getUint32Property() async {
+    var value = await getProperty('com.example.Test', 'Uint32Property', signature: DBusSignature('u'));
+    return value.asUint32();
+  }
+
+  /// Sets com.example.Test.Uint32Property
+  Future<void> setUint32Property (int value) async {
+    await setProperty('com.example.Test', 'Uint32Property', DBusUint32(value));
+  }
+
+  /// Gets com.example.Test.Int64Property
+  Future<int> getInt64Property() async {
+    var value = await getProperty('com.example.Test', 'Int64Property', signature: DBusSignature('x'));
+    return value.asInt64();
+  }
+
+  /// Sets com.example.Test.Int64Property
+  Future<void> setInt64Property (int value) async {
+    await setProperty('com.example.Test', 'Int64Property', DBusInt64(value));
+  }
+
+  /// Gets com.example.Test.Uint64Property
+  Future<int> getUint64Property() async {
+    var value = await getProperty('com.example.Test', 'Uint64Property', signature: DBusSignature('t'));
+    return value.asUint64();
+  }
+
+  /// Sets com.example.Test.Uint64Property
+  Future<void> setUint64Property (int value) async {
+    await setProperty('com.example.Test', 'Uint64Property', DBusUint64(value));
+  }
+
+  /// Gets com.example.Test.DoubleProperty
+  Future<double> getDoubleProperty() async {
+    var value = await getProperty('com.example.Test', 'DoubleProperty', signature: DBusSignature('d'));
+    return value.asDouble();
+  }
+
+  /// Sets com.example.Test.DoubleProperty
+  Future<void> setDoubleProperty (double value) async {
+    await setProperty('com.example.Test', 'DoubleProperty', DBusDouble(value));
+  }
+
+  /// Gets com.example.Test.StringProperty
+  Future<String> getStringProperty() async {
+    var value = await getProperty('com.example.Test', 'StringProperty', signature: DBusSignature('s'));
+    return value.asString();
+  }
+
+  /// Sets com.example.Test.StringProperty
+  Future<void> setStringProperty (String value) async {
+    await setProperty('com.example.Test', 'StringProperty', DBusString(value));
+  }
+
+  /// Gets com.example.Test.ObjectPathProperty
+  Future<DBusObjectPath> getObjectPathProperty() async {
+    var value = await getProperty('com.example.Test', 'ObjectPathProperty', signature: DBusSignature('o'));
+    return value.asObjectPath();
+  }
+
+  /// Sets com.example.Test.ObjectPathProperty
+  Future<void> setObjectPathProperty (DBusObjectPath value) async {
+    await setProperty('com.example.Test', 'ObjectPathProperty', value);
+  }
+
+  /// Gets com.example.Test.SignatureProperty
+  Future<DBusSignature> getSignatureProperty() async {
+    var value = await getProperty('com.example.Test', 'SignatureProperty', signature: DBusSignature('g'));
+    return value.asSignature();
+  }
+
+  /// Sets com.example.Test.SignatureProperty
+  Future<void> setSignatureProperty (DBusSignature value) async {
+    await setProperty('com.example.Test', 'SignatureProperty', value);
+  }
+
+  /// Gets com.example.Test.VariantProperty
+  Future<DBusValue> getVariantProperty() async {
+    var value = await getProperty('com.example.Test', 'VariantProperty', signature: DBusSignature('v'));
+    return value.asVariant();
+  }
+
+  /// Sets com.example.Test.VariantProperty
+  Future<void> setVariantProperty (DBusValue value) async {
+    await setProperty('com.example.Test', 'VariantProperty', DBusVariant(value));
+  }
+
+  /// Gets com.example.Test.UnixFdProperty
+  Future<ResourceHandle> getUnixFdProperty() async {
+    var value = await getProperty('com.example.Test', 'UnixFdProperty', signature: DBusSignature('h'));
+    return value.asUnixFd();
+  }
+
+  /// Sets com.example.Test.UnixFdProperty
+  Future<void> setUnixFdProperty (ResourceHandle value) async {
+    await setProperty('com.example.Test', 'UnixFdProperty', DBusUnixFd(value));
+  }
+
+  /// Gets com.example.Test.StructProperty
+  Future<List<DBusValue>> getStructProperty() async {
+    var value = await getProperty('com.example.Test', 'StructProperty', signature: DBusSignature('(si)'));
+    return value.asStruct();
+  }
+
+  /// Sets com.example.Test.StructProperty
+  Future<void> setStructProperty (List<DBusValue> value) async {
+    await setProperty('com.example.Test', 'StructProperty', DBusStruct(value));
+  }
+
+  /// Gets com.example.Test.ArrayProperty
+  Future<List<int>> getArrayProperty() async {
+    var value = await getProperty('com.example.Test', 'ArrayProperty', signature: DBusSignature('ay'));
+    return value.asByteArray().toList();
+  }
+
+  /// Sets com.example.Test.ArrayProperty
+  Future<void> setArrayProperty (List<int> value) async {
+    await setProperty('com.example.Test', 'ArrayProperty', DBusArray.byte(value));
+  }
+
+  /// Gets com.example.Test.DictProperty
+  Future<Map<String, DBusValue>> getDictProperty() async {
+    var value = await getProperty('com.example.Test', 'DictProperty', signature: DBusSignature('a{sv}'));
+    return value.asStringVariantDict();
+  }
+
+  /// Sets com.example.Test.DictProperty
+  Future<void> setDictProperty (Map<String, DBusValue> value) async {
+    await setProperty('com.example.Test', 'DictProperty', DBusDict.stringVariant(value));
+  }
+}

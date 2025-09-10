@@ -1,0 +1,28 @@
+import 'dart:io';
+import 'package:dbus/dbus.dart';
+
+class ComExampleTest extends DBusRemoteObject {
+  ComExampleTest(DBusClient client, String destination, DBusObjectPath path) : super(client, name: destination, path: path);
+
+  /// Gets com.example.Test.ReadProperty
+  Future<int> getReadProperty() async {
+    var value = await getProperty('com.example.Test', 'ReadProperty', signature: DBusSignature('i'));
+    return value.asInt32();
+  }
+
+  /// Sets com.example.Test.WriteProperty
+  Future<void> setWriteProperty (int value) async {
+    await setProperty('com.example.Test', 'WriteProperty', DBusInt32(value));
+  }
+
+  /// Gets com.example.Test.ReadWriteProperty
+  Future<int> getReadWriteProperty() async {
+    var value = await getProperty('com.example.Test', 'ReadWriteProperty', signature: DBusSignature('i'));
+    return value.asInt32();
+  }
+
+  /// Sets com.example.Test.ReadWriteProperty
+  Future<void> setReadWriteProperty (int value) async {
+    await setProperty('com.example.Test', 'ReadWriteProperty', DBusInt32(value));
+  }
+}

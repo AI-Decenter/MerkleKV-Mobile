@@ -104,14 +104,14 @@ class ReplicationCbor {
     map['seq'] = event.seq;
     map['timestamp_ms'] = event.timestamp_ms;
     map['tombstone'] = event.tombstone;
-    
+
     // Only include value field if not a tombstone
     if (!event.tombstone) {
       map['value'] = event.value;
     }
 
     final encoded = cbor.encode(CborMap(map));
-    
+
     // Enforce final payload size limit
     if (encoded.length > maxPayloadBytes) {
       throw ReplicationSerializationError(
@@ -119,7 +119,7 @@ class ReplicationCbor {
         'CBOR payload size ${encoded.length} exceeds limit of $maxPayloadBytes bytes',
       );
     }
-    
+
     return encoded;
   }
 
@@ -152,7 +152,13 @@ class ReplicationCbor {
     final map = decoded.toObject() as Map<String, dynamic>;
 
     // Validate required fields
-    final requiredFields = ['key', 'node_id', 'seq', 'timestamp_ms', 'tombstone'];
+    final requiredFields = [
+      'key',
+      'node_id',
+      'seq',
+      'timestamp_ms',
+      'tombstone'
+    ];
     for (final field in requiredFields) {
       if (!map.containsKey(field)) {
         throw ReplicationSerializationError(
@@ -246,7 +252,7 @@ class ReplicationCbor {
         'Key cannot be empty',
       );
     }
-    
+
     final keyBytes = utf8.encode(event.key);
     if (keyBytes.length > maxKeyBytes) {
       throw ReplicationSerializationError(
@@ -298,7 +304,7 @@ class ReplicationCbor {
           'Non-tombstone events must have non-null value',
         );
       }
-      
+
       final valueBytes = utf8.encode(event.value!);
       if (valueBytes.length > maxValueBytes) {
         throw ReplicationSerializationError(
@@ -325,10 +331,10 @@ class ReplicationSerializationError implements Exception {
 enum ReplicationSerializationErrorCode {
   /// CBOR data is malformed or cannot be parsed
   malformedCbor,
-  
+
   /// Event violates the expected schema or validation rules
   schemaViolation,
-  
+
   /// Payload size exceeds the maximum allowed limit
   payloadTooLarge,
 }

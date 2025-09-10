@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# This file was created by pub v3.3.4.
+# Package: melos
+# Version: 6.3.2
+# Executable: melos
+# Script: melos
+if [ -f /home/runner/work/MerkleKV-Mobile/MerkleKV-Mobile/.pub-cache/global_packages/melos/bin/melos.dart-3.3.4.snapshot ]; then
+  dart "/home/runner/work/MerkleKV-Mobile/MerkleKV-Mobile/.pub-cache/global_packages/melos/bin/melos.dart-3.3.4.snapshot" "$@"
+  # The VM exits with code 253 if the snapshot version is out-of-date.
+  # If it is, we need to delete it and run "pub global" manually.
+  exit_code=$?
+  if [ $exit_code != 253 ]; then
+    exit $exit_code
+  fi
+  dart pub global run melos:melos "$@"
+else
+  dart pub global run melos:melos "$@"
+fi

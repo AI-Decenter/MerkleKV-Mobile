@@ -1,0 +1,35 @@
+name: cbl_launcher
+repository: https://github.com/blaugold/cli_launcher
+
+packages:
+  - .
+
+ide:
+  intellij: false
+
+command:
+  version:
+    branch: main
+    linkToCommits: true
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  activate_example_cli:
+    run: cd fixture_packages/example_v1 && dart pub global activate --source path .
+
+  format:
+    exec: daco format .
+
+  format:check:
+    exec: daco format --set-exit-if-changed .
+
+  analyze:
+    run: dart analyze --fatal-infos
+    exec:
+      concurrency: 1
+
+  test:
+    exec: dart test -j 1
+    selectPackage:
+      dirExists: test

@@ -119,15 +119,18 @@ void main() {
       final encoded2 = ReplicationCbor.encode(event2);
 
       // Compare as hex strings for clarity
-      final hex1 = encoded1.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      final hex2 = encoded2.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      final hex1 =
+          encoded1.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      final hex2 =
+          encoded2.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
       expect(hex1, equals(hex2));
     });
 
     test('throws for payload exceeding size limit', () {
       // Create a value that will exceed 300 KiB when encoded
-      final largeValue = 'x' * (300 * 1024); // Approximately 300 KiB of 'x' characters
+      final largeValue =
+          'x' * (300 * 1024); // Approximately 300 KiB of 'x' characters
       final event = ReplicationEvent.setValue(
         key: 'large:key',
         value: largeValue,
@@ -138,8 +141,8 @@ void main() {
 
       expect(
         () => ReplicationCbor.encode(event),
-        throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.payloadTooLarge)),
+        throwsA(isA<ReplicationSerializationError>().having((e) => e.code,
+            'code', ReplicationSerializationErrorCode.payloadTooLarge)),
       );
     });
   });
@@ -181,18 +184,19 @@ void main() {
 
       expect(
         () => ReplicationCbor.decode(oversizedPayload),
-        throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.payloadTooLarge)),
+        throwsA(isA<ReplicationSerializationError>().having((e) => e.code,
+            'code', ReplicationSerializationErrorCode.payloadTooLarge)),
       );
     });
 
     test('throws for malformed CBOR', () {
-      final malformedData = Uint8List.fromList([0xFF, 0xFF, 0xFF]); // Invalid CBOR
+      final malformedData =
+          Uint8List.fromList([0xFF, 0xFF, 0xFF]); // Invalid CBOR
 
       expect(
         () => ReplicationCbor.decode(malformedData),
-        throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.malformedCbor)),
+        throwsA(isA<ReplicationSerializationError>().having((e) => e.code,
+            'code', ReplicationSerializationErrorCode.malformedCbor)),
       );
     });
 
@@ -208,8 +212,10 @@ void main() {
       expect(
         () => ReplicationCbor.decode(incompleteCbor),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Missing required field'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Missing required field'))),
       );
     });
 
@@ -227,7 +233,8 @@ void main() {
       expect(
         () => ReplicationCbor.decode(invalidCbor),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
             .having((e) => e.message, 'message', contains('must be a string'))),
       );
     });
@@ -246,8 +253,10 @@ void main() {
       expect(
         () => ReplicationCbor.decode(invalidCbor),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Tombstone events must not contain a "value" field'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Tombstone events must not contain a "value" field'))),
       );
     });
 
@@ -265,8 +274,10 @@ void main() {
       expect(
         () => ReplicationCbor.decode(invalidCbor),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Non-tombstone events must contain a "value" field'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Non-tombstone events must contain a "value" field'))),
       );
     });
   });
@@ -307,8 +318,10 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Key cannot be empty'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having(
+                (e) => e.message, 'message', contains('Key cannot be empty'))),
       );
     });
 
@@ -325,7 +338,8 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
             .having((e) => e.message, 'message', contains('Key UTF-8 size'))),
       );
     });
@@ -342,8 +356,10 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Node ID cannot be empty'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Node ID cannot be empty'))),
       );
     });
 
@@ -360,7 +376,8 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
             .having((e) => e.message, 'message', contains('Node ID length'))),
       );
     });
@@ -377,8 +394,10 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Sequence number must be non-negative'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Sequence number must be non-negative'))),
       );
     });
 
@@ -394,8 +413,10 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Timestamp must be non-negative'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Timestamp must be non-negative'))),
       );
     });
 
@@ -412,7 +433,8 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
             .having((e) => e.message, 'message', contains('Value UTF-8 size'))),
       );
     });
@@ -430,8 +452,10 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Tombstone events must have null value'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Tombstone events must have null value'))),
       );
     });
 
@@ -448,8 +472,10 @@ void main() {
       expect(
         () => ReplicationCbor.validateEvent(event),
         throwsA(isA<ReplicationSerializationError>()
-            .having((e) => e.code, 'code', ReplicationSerializationErrorCode.schemaViolation)
-            .having((e) => e.message, 'message', contains('Non-tombstone events must have non-null value'))),
+            .having((e) => e.code, 'code',
+                ReplicationSerializationErrorCode.schemaViolation)
+            .having((e) => e.message, 'message',
+                contains('Non-tombstone events must have non-null value'))),
       );
     });
   });
@@ -461,7 +487,7 @@ void main() {
       // Approximate overhead: ~50-100 bytes for structure + field names
       final targetValueSize = (300 * 1024) - 200; // Leave room for overhead
       final largeValue = 'x' * targetValueSize;
-      
+
       final event = ReplicationEvent.setValue(
         key: 'k',
         value: largeValue,
@@ -472,7 +498,7 @@ void main() {
 
       final encoded = ReplicationCbor.encode(event);
       expect(encoded.length, lessThanOrEqualTo(300 * 1024));
-      
+
       // Should decode successfully
       final decoded = ReplicationCbor.decode(encoded);
       expect(decoded, equals(event));
@@ -490,11 +516,11 @@ void main() {
 
       // Should validate without throwing
       expect(() => ReplicationCbor.validateEvent(event), returnsNormally);
-      
+
       // Should encode successfully and stay under 300 KiB
       final encoded = ReplicationCbor.encode(event);
       expect(encoded.length, lessThan(300 * 1024));
-      
+
       // Should round-trip correctly
       final decoded = ReplicationCbor.decode(encoded);
       expect(decoded.value?.length, equals(256 * 1024));
@@ -505,12 +531,12 @@ void main() {
       final unicodeChar = '€'; // Euro symbol is 3 bytes in UTF-8
       final utf8Bytes = utf8.encode(unicodeChar);
       expect(utf8Bytes.length, equals(3));
-      
+
       // Create a key that's exactly at the 256 byte limit
       final keyChars = 256 ~/ 3; // 85 characters * 3 bytes = 255 bytes
       final key = unicodeChar * keyChars;
       expect(utf8.encode(key).length, lessThanOrEqualTo(256));
-      
+
       final event = ReplicationEvent.setValue(
         key: key,
         value: 'test',
@@ -524,7 +550,8 @@ void main() {
   });
 
   group('Deterministic encoding verification', () {
-    test('identical events from different instances produce identical CBOR', () {
+    test('identical events from different instances produce identical CBOR',
+        () {
       // Create events separately to ensure they're different instances
       final event1 = ReplicationEvent.setValue(
         key: 'deterministic:test',
@@ -533,7 +560,7 @@ void main() {
         node_id: 'device-1',
         seq: 999,
       );
-      
+
       final event2 = ReplicationEvent.setValue(
         key: 'deterministic:test',
         value: 'same value',
@@ -548,13 +575,15 @@ void main() {
       // Verify they're different instances but equal
       expect(identical(event1, event2), isFalse);
       expect(event1, equals(event2));
-      
+
       // Verify encoded bytes are identical
       expect(encoded1, equals(encoded2));
-      
+
       // Verify as hex strings for visual verification
-      final hex1 = encoded1.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      final hex2 = encoded2.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      final hex1 =
+          encoded1.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+      final hex2 =
+          encoded2.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
       expect(hex1, equals(hex2));
     });
 
@@ -574,7 +603,7 @@ void main() {
 
       expect(encoded1, equals(encoded2));
       expect(encoded2, equals(encoded3));
-      
+
       // Decode and verify field order is preserved in round-trip
       final decoded = ReplicationCbor.decode(encoded1);
       expect(decoded, equals(event));
