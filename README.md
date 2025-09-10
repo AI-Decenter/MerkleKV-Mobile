@@ -40,6 +40,7 @@ The system provides:
   - `keepAliveSeconds=60`, `sessionExpirySeconds=86400`, `skewMaxFutureMs=300000`, `tombstoneRetentionHours=24`.
 - **MQTT Client Layer** (Locked Spec §6): Connection lifecycle, exponential backoff (1s→32s, jitter ±20%), session persistence (Clean Start=false, Session Expiry=24h), LWT, QoS=1 & retain=false enforcement, TLS when credentials present.
 - **Command Correlation Layer** (Locked Spec §3.1-3.2): Request/response correlation with UUIDv4 generation, operation-specific timeouts (10s/20s/30s), deduplication cache (10min TTL, LRU eviction), payload size validation (512 KiB limit), structured logging, and async/await API over MQTT.
+- **Command Processor** (Locked Spec §4.1-§4.4): Core command processing with GET/SET/DEL operations, UTF-8 size validation (keys ≤256B, values ≤256KiB), version vector generation with sequence numbers, idempotency cache with TTL and LRU eviction, comprehensive error handling with standardized error codes.
 - **Storage Engine** (Locked Spec §5.1, §5.6, §8): In-memory key-value store with UTF-8 support, Last-Write-Wins conflict resolution using `(timestampMs, nodeId)` ordering, tombstone management with 24-hour retention and garbage collection, optional persistence with SHA-256 checksums and corruption recovery, size constraints (keys ≤256B, values ≤256KiB UTF-8).
 - **CBOR Serializer** (Locked Spec §3.3): Deterministic CBOR encoding/decoding for replication events with `timestamp_ms` standardization, fixed field ordering (`key`, `node_id`, `seq`, `timestamp_ms`, `tombstone`, `value`), 300 KiB payload limits, UTF-8 aware validation, and comprehensive error handling (`MALFORMED_CBOR`, `SCHEMA_VIOLATION`, `PAYLOAD_TOO_LARGE`).
 
@@ -413,6 +414,49 @@ correlator.dispose();
 - **Payload validation**: Rejects commands > 512 KiB
 - **Structured logging**: Request lifecycle with timing and error codes
 - **Late response handling**: Caches responses that arrive after timeout
+
+## Command Processor Usage
+
+The CommandProcessor handles core GET/SET/DEL operations with validation and idempotency.
+
+```dart
+import 'package:merkle_kv_core/merkle_kv_core.dart';
+
+// Create processor with config and storage
+final config = MerkleKVConfig.create(
+  mqttHost: 'broker.example.com',
+  clientId: 'device-123',
+  nodeId: 'node-uuid',
+);
+final storage = StorageFactory.create(config);
+await storage.initialize();
+
+final processor = CommandProcessorImpl(config, storage);
+
+// Process commands directly
+final getCmd = Command(id: 'req-1', op: 'GET', key: 'user:123');
+final getResponse = await processor.processCommand(getCmd);
+
+final setCmd = Command(id: 'req-2', op: 'SET', key: 'user:123', value: 'John Doe');
+final setResponse = await processor.processCommand(setCmd);
+
+final delCmd = Command(id: 'req-3', op: 'DEL', key: 'user:123');
+final delResponse = await processor.processCommand(delCmd);
+
+// Or use individual methods
+final directGet = await processor.get('user:456');
+final directSet = await processor.set('user:456', 'Jane Doe');
+final directDel = await processor.delete('user:456');
+
+print('Response: ${directGet.status} - ${directGet.value}');
+```
+
+**Features:**
+- **UTF-8 validation**: Keys ≤256B, values ≤256KiB with proper multi-byte handling
+- **Version vectors**: Automatic generation with timestamps and sequence numbers
+- **Idempotency**: 10-minute TTL cache with LRU eviction for duplicate requests
+- **Error handling**: Standardized codes (INVALID_REQUEST=100, NOT_FOUND=102, PAYLOAD_TOO_LARGE=103)
+- **Thread safety**: Atomic sequence number generation for concurrent operations
 
 ## CBOR Replication Usage
 
