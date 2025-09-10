@@ -20,6 +20,7 @@ export 'src/mqtt/topic_router.dart';
 export 'src/commands/command.dart';
 export 'src/commands/response.dart';
 export 'src/commands/command_correlator.dart';
+export 'src/commands/command_processor.dart';
 
 // Storage
 export 'src/storage/storage_interface.dart';

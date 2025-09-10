@@ -501,17 +501,15 @@ For a complete MerkleKV Mobile store with automatic MQTT connection and replicat
 import 'package:merkle_kv_mobile/merkle_kv_mobile.dart';
 
 void main() async {
-  // Initialize the store
-  final store = MerkleKVMobile(
-    MerkleKVConfig(
-      mqttHost: 'broker.example.com',
-      mqttPort: 1883,
-      clientId: 'mobile-${DateTime.now().millisecondsSinceEpoch}',
-      nodeId: 'demo-device',
-    ),
+  // Initialize the store with configuration
+  final config = MerkleKVConfig(
+    mqttHost: 'broker.example.com',
+    mqttPort: 1883,
+    clientId: 'mobile-${DateTime.now().millisecondsSinceEpoch}',
+    nodeId: 'demo-device',
   );
   
-  // Connect to MQTT broker
+  final store = MerkleKVMobile(config);
   await store.connect();
   
   // Use the store (operations will be replicated)

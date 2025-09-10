@@ -4,8 +4,10 @@ import 'dart:convert';
 class ErrorCode {
   static const int invalidRequest = 100;
   static const int timeout = 101;
-  static const int idempotentReplay = 102;
+  static const int notFound = 102;
   static const int payloadTooLarge = 103;
+  static const int idempotentReplay =
+      110; // Special case for idempotent operations
   static const int internalError = 199;
 
   /// Returns human-readable description of error code.
@@ -15,10 +17,12 @@ class ErrorCode {
         return 'Invalid request format or parameters';
       case timeout:
         return 'Request timeout';
-      case idempotentReplay:
-        return 'Idempotent replay of cached response';
+      case notFound:
+        return 'Key not found';
       case payloadTooLarge:
         return 'Payload exceeds maximum size limit';
+      case idempotentReplay:
+        return 'Idempotent replay of cached response';
       case internalError:
         return 'Internal server error';
       default:
@@ -138,6 +142,15 @@ class Response {
       id: id,
       error: ErrorCode.describe(ErrorCode.payloadTooLarge),
       errorCode: ErrorCode.payloadTooLarge,
+    );
+  }
+
+  /// Creates a not found error response.
+  factory Response.notFound(String id) {
+    return Response.error(
+      id: id,
+      error: ErrorCode.describe(ErrorCode.notFound),
+      errorCode: ErrorCode.notFound,
     );
   }
 

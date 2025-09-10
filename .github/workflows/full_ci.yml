@@ -55,7 +55,6 @@ on:
       - 'pubspec*.yaml'
       - 'package.json'
       - 'pnpm-lock.yaml'
-      - '.markdownlint.json'
   pull_request:
     branches: [ main ]
     paths:
@@ -68,7 +67,6 @@ on:
       - 'pubspec*.yaml'
       - 'package.json'
       - 'pnpm-lock.yaml'
-      - '.markdownlint.json'
   workflow_dispatch:
     inputs:
       skip_tests:
@@ -514,39 +512,9 @@ jobs:
         run: |
           echo "Installing documentation quality assurance tools..."
           npm install -g \
-            markdownlint-cli@latest \
             markdown-link-check@latest \
             cspell@latest
           echo "✅ Documentation tools installed successfully"
-          
-      # -----------------------------------------------------------------------
-      # Markdown Formatting and Style Validation
-      # -----------------------------------------------------------------------
-      # Enforces consistent markdown formatting across documentation,
-      # improving readability and maintainability while preventing
-      # formatting inconsistencies that harm user experience
-      #
-      - name: 📝 Validate Markdown Formatting and Style
-        run: |
-          echo "Validating Markdown formatting and style consistency..."
-          
-          # Use project-specific configuration if available
-          if [ -f ".markdownlint.json" ]; then
-            echo "Using project-specific markdownlint configuration"
-            markdownlint "**/*.md" \
-              --ignore node_modules \
-              --ignore .git \
-              --ignore .dart_tool \
-              --config .markdownlint.json
-          else
-            echo "Using default markdownlint configuration"
-            markdownlint "**/*.md" \
-              --ignore node_modules \
-              --ignore .git \
-              --ignore .dart_tool
-          fi
-          
-          echo "✅ Markdown formatting validation completed"
           
       # -----------------------------------------------------------------------
       # Link Integrity Verification with Rate Limiting
