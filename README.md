@@ -492,6 +492,36 @@ final tombstone = ReplicationEvent.setTombstone(
 // Tombstones omit the value field in CBOR
 final tombstoneBytes = ReplicationCbor.encode(tombstone);
 ```
+
+### High-Level Store Usage
+
+For a complete MerkleKV Mobile store with automatic MQTT connection and replication:
+
+```dart
+import 'package:merkle_kv_mobile/merkle_kv_mobile.dart';
+
+void main() async {
+  // Initialize the store
+  final store = MerkleKVMobile(
+    MerkleKVConfig(
+      mqttHost: 'broker.example.com',
+      mqttPort: 1883,
+      clientId: 'mobile-${DateTime.now().millisecondsSinceEpoch}',
+      nodeId: 'demo-device',
+    ),
+  );
+  
+  // Connect to MQTT broker
+  await store.connect();
+  
+  // Use the store (operations will be replicated)
+  await store.set('user:123', 'john_doe');
+  final result = await store.get('user:123');
+  print('Retrieved: ${result.value}');
+  
+  // Clean up
+  await store.disconnect();
+}
 ```
 
 ## 📋 Usage Example
