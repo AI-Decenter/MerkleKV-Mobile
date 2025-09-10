@@ -16,3 +16,11 @@ Then run:
 ```bash
 flutter pub get
 ```
+
+## Features
+
+- **MQTT-based communication** with connection management and topic routing
+- **In-memory storage** with Last-Write-Wins conflict resolution and optional persistence  
+- **Command correlation** for request-response patterns over MQTT
+- **CBOR serialization** for deterministic replication event encoding with size limits
+- **Comprehensive configuration** with validation and security features

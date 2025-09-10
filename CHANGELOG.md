@@ -21,6 +21,13 @@ Specification v1.0 compliance.
   - UTF-8 size validation per §11: keys ≤256 bytes, values ≤256 KiB with multi-byte character support
   - StorageEntry model with version vectors, StorageInterface abstraction, InMemoryStorage implementation, and StorageFactory
   - Comprehensive unit tests covering LWW edge cases, tombstone GC, persistence round-trip, and UTF-8 boundaries
+- **CBOR Serializer** (Issue #12, Locked Spec §3.3): Deterministic replication event serialization implementation:
+  - ReplicationEvent model with standardized `timestamp_ms` field naming and tombstone support
+  - Deterministic CBOR encoding with fixed field insertion order: `key`, `node_id`, `seq`, `timestamp_ms`, `tombstone`, `value`
+  - Hard payload size limit enforcement (≤300 KiB) with UTF-8 aware validation 
+  - Comprehensive error handling: `MALFORMED_CBOR`, `SCHEMA_VIOLATION`, `PAYLOAD_TOO_LARGE` error codes
+  - Cross-device determinism verification and extensive boundary testing (583 lines of tests)
+  - Tombstone value field omission optimization for efficient encoding
 - **Tests**: 28 tests for config, 21 tests for MQTT client, 45+ tests for command correlation; statistical jitter validation; subscription and publish enforcement.
 - Initial repository structure and development setup
 - Comprehensive automation scripts for GitHub issue management

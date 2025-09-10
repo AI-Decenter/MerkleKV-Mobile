@@ -242,15 +242,20 @@ merkle_kv_mobile/
 
 ```cbor
 {
-  "op": "SET",
-  "key": "user:123",
-  "value": "john_doe",
-  "timestamp": 1637142400000,
-  "node_id": "device-xyz",
-  "seq": 42,
-  "checksum": "abc123"
+  "key": "user:123",         // Key modified
+  "node_id": "device-xyz",   // Source device ID
+  "seq": 42,                 // Sequence number
+  "timestamp_ms": 1637142400000, // Timestamp in milliseconds
+  "tombstone": false,        // Whether this is a deletion
+  "value": "john_doe"        // Value (omitted if tombstone=true)
 }
 ```
+
+**CBOR Encoding Features:**
+- **Deterministic field order**: Fixed insertion sequence ensures cross-device consistency
+- **Size limits**: Payload ≤ 300 KiB; keys ≤ 256B UTF-8; values ≤ 256 KiB UTF-8
+- **Tombstone optimization**: Value field omitted for deletions
+- **Error handling**: Comprehensive validation with specific error codes
 
 ## 🗄️ Storage Architecture
 

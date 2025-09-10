@@ -27,5 +27,8 @@ export 'src/storage/storage_entry.dart';
 export 'src/storage/in_memory_storage.dart';
 export 'src/storage/storage_factory.dart';
 
+// Replication
+export 'src/replication/cbor_serializer.dart';
+
 // Core exports will be added in future phases
 // export 'src/merkle_kv_mobile.dart';

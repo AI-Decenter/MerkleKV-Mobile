@@ -41,6 +41,7 @@ The system provides:
 - **MQTT Client Layer** (Locked Spec §6): Connection lifecycle, exponential backoff (1s→32s, jitter ±20%), session persistence (Clean Start=false, Session Expiry=24h), LWT, QoS=1 & retain=false enforcement, TLS when credentials present.
 - **Command Correlation Layer** (Locked Spec §3.1-3.2): Request/response correlation with UUIDv4 generation, operation-specific timeouts (10s/20s/30s), deduplication cache (10min TTL, LRU eviction), payload size validation (512 KiB limit), structured logging, and async/await API over MQTT.
 - **Storage Engine** (Locked Spec §5.1, §5.6, §8): In-memory key-value store with UTF-8 support, Last-Write-Wins conflict resolution using `(timestampMs, nodeId)` ordering, tombstone management with 24-hour retention and garbage collection, optional persistence with SHA-256 checksums and corruption recovery, size constraints (keys ≤256B, values ≤256KiB UTF-8).
+- **CBOR Serializer** (Locked Spec §3.3): Deterministic CBOR encoding/decoding for replication events with `timestamp_ms` standardization, fixed field ordering (`key`, `node_id`, `seq`, `timestamp_ms`, `tombstone`, `value`), 300 KiB payload limits, UTF-8 aware validation, and comprehensive error handling (`MALFORMED_CBOR`, `SCHEMA_VIOLATION`, `PAYLOAD_TOO_LARGE`).
 
 ### Storage Engine Features
 
@@ -254,18 +255,24 @@ Responses are published as JSON objects to the response topic:
 
 ### Change Event Format
 
-Change events are serialized using CBOR for efficiency and published to the replication topic:
+Change events are serialized using CBOR for efficiency and published to the replication topic with deterministic field ordering:
 
 ```cbor
 {
-  "op": "SET",              // Operation type
-  "key": "user:123",        // Key modified
-  "value": "john_doe",      // New value (if applicable)
-  "timestamp": 1637142400,  // Operation timestamp (UTC)
-  "node_id": "device-xyz",  // Source device ID
-  "seq": 42                 // Sequence number for ordering
+  "key": "user:123",         // Key modified
+  "node_id": "device-xyz",   // Source device ID  
+  "seq": 42,                 // Sequence number for ordering
+  "timestamp_ms": 1637142400000, // Operation timestamp (UTC milliseconds)
+  "tombstone": false,        // Whether this is a deletion
+  "value": "john_doe"        // New value (omitted if tombstone=true)
 }
 ```
+
+**CBOR Schema Features:**
+- **Deterministic encoding**: Fixed field insertion order ensures identical binary output across devices
+- **Size limits**: Total CBOR payload ≤ 300 KiB; keys ≤ 256B UTF-8; values ≤ 256 KiB UTF-8
+- **Tombstone handling**: Value field omitted for deletions (tombstone=true)
+- **Error handling**: `MALFORMED_CBOR`, `SCHEMA_VIOLATION`, `PAYLOAD_TOO_LARGE` error codes
 
 ### Conflict Resolution
 
@@ -407,8 +414,40 @@ correlator.dispose();
 - **Structured logging**: Request lifecycle with timing and error codes
 - **Late response handling**: Caches responses that arrive after timeout
 
-final store = MerkleKVMobile(config);
-await store.connect();
+## CBOR Replication Usage
+
+The CBOR serializer provides deterministic encoding for replication events:
+
+```dart
+import 'package:merkle_kv_core/merkle_kv_core.dart';
+
+// Create a replication event
+final event = ReplicationEvent.setValue(
+  key: 'user:123',
+  value: 'john_doe',
+  timestamp_ms: DateTime.now().millisecondsSinceEpoch,
+  node_id: 'device-xyz',
+  seq: 42,
+);
+
+// Encode to CBOR for MQTT transmission (deterministic)
+final cborBytes = ReplicationCbor.encode(event);
+
+// Decode from CBOR (preserves exact structure)
+final decodedEvent = ReplicationCbor.decode(cborBytes);
+assert(event == decodedEvent);
+
+// Create tombstone event for deletions
+final tombstone = ReplicationEvent.setTombstone(
+  key: 'user:456',
+  timestamp_ms: DateTime.now().millisecondsSinceEpoch,
+  node_id: 'device-xyz',
+  seq: 43,
+);
+
+// Tombstones omit the value field in CBOR
+final tombstoneBytes = ReplicationCbor.encode(tombstone);
+```
 ```
 
 ## 📋 Usage Example
@@ -472,7 +511,7 @@ void main() async {
 
 ### Phase 3: Replication System
 
-1. Implement change event serialization (CBOR)
+1. ✅ Implement change event serialization (CBOR) - **COMPLETED**
 2. Add replication event publishing
 3. Implement replication event handling
 4. Add Last-Write-Wins conflict resolution
