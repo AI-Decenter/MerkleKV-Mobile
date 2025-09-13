@@ -123,7 +123,6 @@ class ReplicationEventPublisherImpl implements ReplicationEventPublisher {
   StreamSubscription<dynamic>? _connectionSubscription;
   bool _initialized = false;
   bool _disposed = false;
-  bool _flushing = false;
   
   final Completer<void> _ready = Completer<void>();
 
@@ -220,7 +219,6 @@ class ReplicationEventPublisherImpl implements ReplicationEventPublisher {
     _ensureInitialized(); // Check initialization before awaiting ready()
     await ready();
     
-    _flushing = true;
     try {
       final startTime = DateTime.now();
       
@@ -274,7 +272,7 @@ class ReplicationEventPublisherImpl implements ReplicationEventPublisher {
         await Future<void>.delayed(Duration.zero);
       }
     } finally {
-      _flushing = false;
+      // Cleanup if needed
     }
 
     _emitStatus();

@@ -14,12 +14,6 @@ class OptimizedMqttClient implements MqttClientInterface {
   /// The underlying MQTT client
   final MqttClientInterface _client;
   
-  /// The payload optimizer for message size reduction
-  final PayloadOptimizer _optimizer;
-  
-  /// The size estimator for pre-flight validation
-  final SizeEstimator _sizeEstimator = SizeEstimator();
-  
   /// Metrics collection
   final ReplicationMetrics? _metrics;
 
@@ -29,8 +23,7 @@ class OptimizedMqttClient implements MqttClientInterface {
     MqttClientInterface client, {
     ReplicationMetrics? metrics,
   }) : _client = client,
-       _metrics = metrics,
-       _optimizer = PayloadOptimizer(metrics: metrics);
+       _metrics = metrics;
 
   @override
   Stream<ConnectionState> get connectionState => _client.connectionState;
@@ -56,7 +49,7 @@ class OptimizedMqttClient implements MqttClientInterface {
         if (jsonData is Map<String, dynamic>) {
           // Valid JSON object, apply optimization
           final String encoded = jsonEncode(
-            _reorderJsonFields(jsonData as Map<String, dynamic>)
+            _reorderJsonFields(jsonData)
           );
           optimizedPayload = encoded;
         } else {

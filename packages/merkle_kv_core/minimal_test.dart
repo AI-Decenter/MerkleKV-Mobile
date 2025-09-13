@@ -32,7 +32,6 @@ class TestLogger implements ConnectionLogger {
 /// Simple mock MQTT client for minimal testing
 class SimpleMockClient implements MqttClientInterface {
   StreamController<ConnectionState>? _controller;
-  ConnectionState _state = ConnectionState.disconnected;
   bool shouldFail = false;
   Duration delay = Duration.zero;
 
@@ -44,7 +43,6 @@ class SimpleMockClient implements MqttClientInterface {
   Stream<ConnectionState> get connectionState => _controller!.stream;
 
   void _setState(ConnectionState state) {
-    _state = state;
     if (_controller != null && !_controller!.isClosed) {
       _controller!.add(state);
     }

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:test/test.dart';
 import 'package:merkle_kv_core/src/config/merkle_kv_config.dart';
-import 'package:merkle_kv_core/src/config/invalid_config_exception.dart';
 import 'package:merkle_kv_core/src/mqtt/connection_state.dart';
 import 'package:merkle_kv_core/src/mqtt/mqtt_client_interface.dart';
 import 'package:merkle_kv_core/src/mqtt/topic_router.dart';

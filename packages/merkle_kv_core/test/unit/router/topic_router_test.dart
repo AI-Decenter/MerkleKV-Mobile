@@ -10,7 +10,6 @@ import 'dart:async';
 void main() {
   late TopicRouterImpl topicRouter;
   late MerkleKVConfig config;
-  late TopicValidator topicValidator;
   late MockMqttClientInterface mockMqttClient;
 
   setUp(() {
@@ -28,7 +27,6 @@ void main() {
     when(mockMqttClient.connectionState)
         .thenAnswer((_) => Stream<ConnectionState>.empty());
     
-    topicValidator = TopicValidator();
     topicRouter = TopicRouterImpl(config, mockMqttClient);
   });
 
@@ -144,22 +142,6 @@ void main() {
 
     group('Multi-tenant isolation', () {
       test('tenant-specific topic isolation', () {
-        final tenant1Config = MerkleKVConfig(
-          clientId: 'tenant1-client',
-          nodeId: 'tenant1-node',
-          topicPrefix: 'tenant1/merkle',
-          mqttHost: 'test.example.com',
-          mqttPort: 1883,
-        );
-        
-        final tenant2Config = MerkleKVConfig(
-          clientId: 'tenant2-client', 
-          nodeId: 'tenant2-node',
-          topicPrefix: 'tenant2/merkle',
-          mqttHost: 'test.example.com',
-          mqttPort: 1883,
-        );
-        
         final tenant1Topic = 'tenant1/merkle/cmd/target';
         final tenant2Topic = 'tenant2/merkle/cmd/target';
         

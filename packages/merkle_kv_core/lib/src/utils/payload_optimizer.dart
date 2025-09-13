@@ -24,7 +24,7 @@ class PayloadOptimizer {
   final ReplicationMetrics? _metrics;
 
   /// Maximum message size in bytes (per Locked Spec §11)
-  static const int _maxMessageSizeBytes = 262144; // 256 KiB
+  static const int maxMessageSizeBytes = 262144; // 256 KiB
 
   /// Creates a new payload optimizer
   PayloadOptimizer({ReplicationMetrics? metrics}) : _metrics = metrics;

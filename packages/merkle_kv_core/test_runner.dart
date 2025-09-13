@@ -96,7 +96,7 @@ class MockMqttClient implements MqttClientInterface {
     _subscriptions.clear();
     _handlers.clear();
     
-    await Future.delayed(Duration(milliseconds: 10));
+    await Future.delayed(const Duration(milliseconds: 10));
     setState(ConnectionState.disconnected);
   }
 
@@ -198,7 +198,7 @@ Future<void> testConnectionTimeout() async {
   );
   
   final mockClient = MockMqttClient();
-  mockClient.connectDelay = Duration(seconds: 5); // Longer than timeout
+  mockClient.connectDelay = const Duration(seconds: 5); // Longer than timeout
   final metrics = InMemoryReplicationMetrics();
   
   final manager = DefaultConnectionLifecycleManager(

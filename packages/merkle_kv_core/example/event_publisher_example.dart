@@ -3,14 +3,6 @@ import 'package:merkle_kv_core/merkle_kv_core.dart';
 
 /// Example demonstrating replication event publishing
 void main() async {
-  // Configuration
-  final config = MerkleKVConfig(
-    mqttHost: 'broker.example.com',
-    nodeId: 'node-1',
-    clientId: 'client-1',
-    topicPrefix: 'production/cluster-a',
-  );
-
   // Topic scheme for replication
   final topicScheme = TopicScheme.create('production/cluster-a', 'client-1');
   print('Replication topic: ${topicScheme.replicationTopic}');

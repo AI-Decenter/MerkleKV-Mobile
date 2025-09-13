@@ -263,7 +263,6 @@ class DeduplicationTracker {
 
 /// Implementation of replication event applicator with deduplication and LWW
 class ReplicationEventApplicatorImpl implements ReplicationEventApplicator {
-  final MerkleKVConfig _config;
   final StorageInterface _storage;
   final ReplicationMetrics _metrics;
   final DeduplicationTracker _deduplicationTracker;
@@ -287,8 +286,7 @@ class ReplicationEventApplicatorImpl implements ReplicationEventApplicator {
     ReplicationMetrics? metrics,
     DeduplicationTracker? deduplicationTracker,
     LWWResolver? lwwResolver,
-  }) : _config = config,
-       _storage = storage,
+  }) : _storage = storage,
        _metrics = metrics ?? const NoOpReplicationMetrics(),
        _deduplicationTracker = deduplicationTracker ?? DeduplicationTracker(),
        _lwwResolver = lwwResolver ?? LWWResolverImpl();
