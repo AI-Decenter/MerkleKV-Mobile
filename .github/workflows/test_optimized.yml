@@ -102,8 +102,6 @@ jobs:
           for i in {1..30}; do
             if nc -z 127.0.0.1 1883 2>/dev/null; then
               echo "✅ MQTT broker is ready on port 1883"
-              # Test with mosquitto_pub to ensure broker is fully functional
-              docker exec mosquitto mosquitto_pub -h localhost -t test -m "broker ready" && echo "✅ MQTT broker is functional"
               break
             fi
             echo "Waiting for MQTT broker... ($i/30)"
@@ -113,6 +111,20 @@ jobs:
           # Final check
           if ! nc -z 127.0.0.1 1883; then
             echo "❌ MQTT broker failed to start"
+            docker logs mosquitto
+            exit 1
+          fi
+          
+          # Give the broker additional time to fully initialize after port opens
+          echo "Waiting additional 5 seconds for broker initialization..."
+          sleep 5
+          
+          # Test with verbose mosquitto_pub to ensure broker is fully functional
+          echo "Testing MQTT broker connectivity..."
+          if docker exec mosquitto mosquitto_pub -d -h localhost -t test -m "broker ready"; then
+            echo "✅ MQTT broker is functional"
+          else
+            echo "❌ MQTT broker connection test failed"
             docker logs mosquitto
             exit 1
           fi

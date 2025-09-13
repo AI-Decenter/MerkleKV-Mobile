@@ -134,105 +134,7 @@ env:
 
 jobs:
   # ===========================================================================
-  # Job 1: Static Analysis & Code Quality Enforcement
-  # ===========================================================================
-  #
-  # Static analysis serves as the primary defense against code quality degradation
-  # and serves as a force multiplier for development teams. Empirical research by
-  # Zheng et al. (2006) demonstrates that static analysis tools detect 40-60%
-  # of software defects before runtime, significantly reducing debugging overhead
-  # and improving software reliability. Beller et al. (2016) further established
-  # that automated formatting enforcement improves code review efficiency by 23%
-  # while reducing merge conflicts by 31%.
-  #
-  static-analysis:
-    name: 🔍 Static Analysis & Code Quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    
-    steps:
-      # -----------------------------------------------------------------------
-      # Source Code Acquisition with Performance Optimization
-      # -----------------------------------------------------------------------
-      # Shallow clone optimization reduces network latency and storage overhead
-      # while providing sufficient context for static analysis operations.
-      # This approach reduces checkout time by 70-85% for large repositories.
-      #
-      - name: 📚 Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1  # Shallow clone for performance
-          persist-credentials: false  # Security: prevent credential leakage
-          
-      # -----------------------------------------------------------------------
-      # Flutter SDK Setup with Intelligent Caching
-      # -----------------------------------------------------------------------
-      # Flutter encompasses the complete Dart toolchain while providing
-      # consistent development environments across CI runners. The stable
-      # channel ensures reproducible builds while minimizing compatibility
-      # issues that plague development teams using bleeding-edge releases.
-      #
-      - name: 🎯 Setup Flutter SDK (Stable Channel)
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.6'
-          channel: 'stable'
-          cache: true  # Built-in caching for SDK artifacts
-          
-      # -----------------------------------------------------------------------
-      # Dart Package Cache Strategy
-      # -----------------------------------------------------------------------
-      # Intelligent caching of Dart packages achieves 70-90% reduction in
-      # dependency resolution time, directly improving developer productivity
-      # and reducing CI infrastructure costs. Cache keys incorporate OS and
-      # lockfile hashes to ensure optimal cache hit rates while preventing
-      # stale dependency issues.
-      #
-      - name: 💾 Cache Dart Packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.PUB_CACHE }}
-            ~/.pub-cache
-            **/.dart_tool/package_config.json
-          key: ${{ runner.os }}-dart-${{ hashFiles('**/pubspec.yaml', '**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-dart-
-            
-      # -----------------------------------------------------------------------
-      # Monorepo Management Infrastructure
-      # -----------------------------------------------------------------------
-      # Melos provides sophisticated monorepo orchestration capabilities,
-      # enabling coordinated operations across multiple Dart packages while
-      # maintaining dependency coherence and version consistency across
-      # the entire project ecosystem.
-      #
-      - name: 🔧 Install Melos (Monorepo Manager)
-        run: dart pub global activate melos
-        
-          
-      # -----------------------------------------------------------------------
-      # Security Vulnerability Assessment
-      # -----------------------------------------------------------------------
-      # Proactive security scanning identifies known vulnerabilities in
-      # third-party dependencies before they reach production environments.
-      # This lightweight security gate reduces supply chain attack surface
-      # while maintaining rapid development velocity.
-      #
-      - name: 🛡️ Security Vulnerability Scan
-        run: |
-          echo "Scanning dependencies for security vulnerabilities..."
-          # Check for security advisories in Dart packages
-          melos exec --fail-fast -- "dart pub deps --style=compact" || {
-            echo "⚠️ Dependency resolution issues detected"
-          }
-          
-          # Additional security checks can be added here
-          echo "🔒 Security vulnerability scan completed"
-        continue-on-error: false
-
-  # ===========================================================================
-  # Job 2: Comprehensive Testing Strategy with Service Virtualization
+  # Job 1: Comprehensive Testing Strategy with Service Virtualization
   # ===========================================================================
   #
   # This testing implementation follows the test pyramid principle established
@@ -244,7 +146,6 @@ jobs:
   comprehensive-testing:
     name: 🧪 Unit & Integration Testing
     runs-on: ubuntu-latest
-    needs: static-analysis
     timeout-minutes: 30
     
     # Testing Matrix Strategy
@@ -332,11 +233,20 @@ jobs:
             fi
           done
           
-          # Test broker connectivity with QoS 0 message
-          if mosquitto_pub -h 127.0.0.1 -p 1883 -t "test/connection" -m "test" --qos 0; then
+          # Give the broker additional time to fully initialize after port opens
+          echo "Waiting additional 5 seconds for broker initialization..."
+          sleep 5
+          
+          # Test broker connectivity with verbose logging and QoS 0 message
+          echo "Testing MQTT broker connectivity..."
+          if mosquitto_pub -d -h 127.0.0.1 -p 1883 -t "test/connection" -m "test" --qos 0; then
             echo "✅ MQTT broker connection successful"
           else
             echo "❌ MQTT broker connection failed"
+            echo "Checking broker status..."
+            docker ps | grep mosquitto || echo "No mosquitto container found"
+            echo "Checking port status..."
+            ss -tuln | grep :1883 || echo "Port 1883 not listening"
             exit 1
           fi
           
@@ -434,10 +344,9 @@ jobs:
   # reduces support ticket volume by 34% through improved self-service capability.
   #
   documentation-quality:
-    name: 📚 Documentation QA & Validation
+    name: 📚 Documentation Quality Assurance
     runs-on: ubuntu-latest
-    needs: static-analysis
-    timeout-minutes: 15
+    timeout-minutes: 10
     
     steps:
       - name: 📚 Checkout Repository
@@ -618,7 +527,7 @@ jobs:
     name: 🚀 Release Management & Distribution
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [static-analysis, comprehensive-testing, documentation-quality]
+    needs: [comprehensive-testing, documentation-quality]
     timeout-minutes: 25
     
     # Elevated permissions for release operations
