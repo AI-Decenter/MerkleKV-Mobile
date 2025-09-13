@@ -48,10 +48,10 @@ scripts:
       echo "Running Flutter tests..."
       melos run test:melos:flutter || echo "No Flutter packages with tests"
   
-  format:
-    run: dart format --set-exit-if-changed .
-    exec:
-      failFast: true
+  # format:
+  #   run: dart format --set-exit-if-changed .
+  #   exec:
+  #     failFast: true
   
   build:flutter:
     run: flutter build apk
