@@ -70,8 +70,9 @@ jobs:
       run:
         working-directory: packages/merkle_kv_core
     env:
-      MQTT_HOST: 127.0.0.1
-      MQTT_PORT: 1883
+      MQTT_TEST_HOST: 127.0.0.1
+      MQTT_TEST_PORT: 1883
+      CI: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -126,13 +127,16 @@ jobs:
       - name: Install dependencies
         run: dart pub get
         
-      - name: Run integration tests with increased timeouts
+      - name: Run integration tests with real MQTT broker
         run: |
-          # Set longer timeouts for CI environment
+          # Set environment for integration tests with real broker
+          export MQTT_TEST_HOST=127.0.0.1
+          export MQTT_TEST_PORT=1883
           export MQTT_CONNECT_TIMEOUT=10
           export MQTT_TEST_TIMEOUT=15
-          # Run integration tests excluding network-dependent ones
-          dart test test/integration/ --exclude-tags=integration --reporter=github --timeout=60s
+          
+          # Run integration tests that need real MQTT broker
+          dart test test/ --tags=integration --reporter=github --timeout=60s
         
       - name: Show MQTT broker logs on failure
         if: failure()

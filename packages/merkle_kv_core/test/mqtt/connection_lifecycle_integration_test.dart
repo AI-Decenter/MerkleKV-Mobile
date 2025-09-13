@@ -30,16 +30,7 @@ class IntegrationTestTimings {
 /// - MQTT_TEST_PASSWORD (optional)
 /// - MQTT_TEST_USE_TLS (default: false)
 void main() {
-  // Skip all integration tests if running in CI without proper setup
-  if (Platform.environment['CI'] == 'true' && Platform.environment['MQTT_TEST_HOST'] == null) {
-    test('Integration tests skipped in CI', () {
-      print('Skipping MQTT integration tests in CI environment');
-      print('Set MQTT_TEST_HOST environment variable to enable integration tests');
-    });
-    return;
-  }
-  
-  // Check if broker is available
+  // Check if broker is available  
   final host = Platform.environment['MQTT_TEST_HOST'] ?? 'localhost';
   final port = int.tryParse(Platform.environment['MQTT_TEST_PORT'] ?? '1883') ?? 1883;
   final username = Platform.environment['MQTT_TEST_USERNAME'];

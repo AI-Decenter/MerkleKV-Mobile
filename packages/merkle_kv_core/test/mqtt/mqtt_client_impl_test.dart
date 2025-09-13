@@ -9,23 +9,17 @@ import 'package:merkle_kv_core/src/mqtt/connection_state.dart';
 import 'package:merkle_kv_core/src/mqtt/mqtt_client_impl.dart';
 
 void main() {
-  // Skip all integration tests if running in CI without proper setup
-  if (Platform.environment['CI'] == 'true' && Platform.environment['MQTT_TEST_HOST'] == null) {
-    test('Integration tests skipped in CI', () {
-      print('Skipping MQTT client integration tests in CI environment');
-      print('Set MQTT_TEST_HOST environment variable to enable integration tests');
-    });
-    return;
-  }
-  
   group('MqttClientImpl', () {
     late MerkleKVConfig config;
     late MqttClientImpl client;
 
     setUp(() {
+      final host = Platform.environment['MQTT_TEST_HOST'] ?? 'localhost';
+      final port = int.tryParse(Platform.environment['MQTT_TEST_PORT'] ?? '1883') ?? 1883;
+      
       config = MerkleKVConfig(
-        mqttHost: 'localhost',
-        mqttPort: 1883,
+        mqttHost: host,
+        mqttPort: port,
         clientId: 'test-client-${DateTime.now().millisecondsSinceEpoch}',
         nodeId: 'test-node',
         mqttUseTls: false,

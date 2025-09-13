@@ -259,10 +259,15 @@ jobs:
     # the complexity and maintenance overhead of extensive mocking strategies
     services:
       mosquitto:
-        image: eclipse-mosquitto:1.6
+        image: eclipse-mosquitto:2.0
         ports:
           - 1883:1883
           - 9001:9001
+        options: >-
+          --health-cmd "mosquitto_pub -h localhost -t health -m test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
         
     steps:
       - name: 📚 Checkout Repository
@@ -376,27 +381,19 @@ jobs:
       - name: 🔗 Execute Integration Test Suite
         if: matrix.tier == 'integration' && github.event.inputs.skip_tests != 'true'
         env:
-          MQTT_BROKER_HOST: ${{ env.MQTT_BROKER_HOST }}
-          MQTT_BROKER_PORT: ${{ env.MQTT_BROKER_PORT }}
+          MQTT_TEST_HOST: 127.0.0.1
+          MQTT_TEST_PORT: 1883
+          CI: true
         run: |
           echo "Executing integration test suite with real MQTT broker..."
           
-          if [ -d "tests/integration" ]; then
-            cd tests/integration
-            
-            # Execute integration tests with extended timeout for network operations
-            if dart test --reporter=expanded --timeout=60s; then
-              echo "✅ Integration tests completed successfully"
-            else
-              echo "❌ Integration tests failed"
-              exit 1
-            fi
-            
-            cd - > /dev/null
+          # Run integration tests with tags
+          echo "Running integration tests with MQTT broker at ${MQTT_TEST_HOST}:${MQTT_TEST_PORT}..."
+          if melos exec --scope="packages/**" -- "dart test --tags=integration --reporter=expanded --timeout=60s"; then
+            echo "✅ Integration tests completed successfully"
           else
-            echo "ℹ️ No integration tests found, creating placeholder..."
-            mkdir -p tests/integration
-            echo "// TODO: Implement integration tests" > tests/integration/placeholder_test.dart
+            echo "❌ Integration tests failed"
+            exit 1
           fi
           
       # -----------------------------------------------------------------------
