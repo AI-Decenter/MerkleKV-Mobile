@@ -1,16 +1,38 @@
 import 'package:test/test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:merkle_kv_core/src/mqtt/topic_router.dart';
-import 'package:merkle_kv_core/src/mqtt/topic_validator.dart';
 import 'package:merkle_kv_core/src/mqtt/connection_state.dart';
+import 'package:merkle_kv_core/src/mqtt/mqtt_client_interface.dart';
 import 'package:merkle_kv_core/src/config/merkle_kv_config.dart';
-import 'topic_router_test.mocks.dart';
 import 'dart:async';
+
+/// Simple test mock for MQTT client
+class TestMqttClient implements MqttClientInterface {
+  final StreamController<ConnectionState> _controller = 
+      StreamController<ConnectionState>.broadcast();
+
+  @override
+  Stream<ConnectionState> get connectionState => _controller.stream;
+
+  @override
+  Future<void> connect() async {}
+
+  @override
+  Future<void> disconnect({bool suppressLWT = true}) async {}
+
+  @override
+  Future<void> publish(String topic, String payload, {bool forceQoS1 = true, bool forceRetainFalse = true}) async {}
+
+  @override
+  Future<void> subscribe(String topic, void Function(String topic, String payload) handler) async {}
+
+  @override
+  Future<void> unsubscribe(String topic) async {}
+}
 
 void main() {
   late TopicRouterImpl topicRouter;
   late MerkleKVConfig config;
-  late MockMqttClientInterface mockMqttClient;
+  late TestMqttClient mockMqttClient;
 
   setUp(() {
     config = MerkleKVConfig(
@@ -21,12 +43,7 @@ void main() {
       mqttPort: 1883,
     );
     
-    mockMqttClient = MockMqttClientInterface();
-    
-    // Stub the connectionState property to return a valid Stream
-    when(mockMqttClient.connectionState)
-        .thenAnswer((_) => Stream<ConnectionState>.empty());
-    
+    mockMqttClient = TestMqttClient();
     topicRouter = TopicRouterImpl(config, mockMqttClient);
   });
 

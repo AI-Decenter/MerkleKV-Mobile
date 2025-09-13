@@ -2,6 +2,7 @@ import 'package:test/test.dart';
 import 'package:merkle_kv_core/src/mqtt/mqtt_client_impl.dart';
 import 'package:merkle_kv_core/src/mqtt/connection_state.dart';
 import 'package:merkle_kv_core/src/config/merkle_kv_config.dart';
+import 'package:merkle_kv_core/src/config/invalid_config_exception.dart';
 
 void main() {
   late MerkleKVConfig config;
@@ -107,14 +108,15 @@ void main() {
 
     group('Error Handling', () {
       test('invalid host configuration', () {
-        final invalidConfig = MerkleKVConfig(
-          clientId: 'test-client',
-          nodeId: 'test-node',
-          mqttHost: '', // Empty host
+        // Empty host should throw InvalidConfigException
+        expect(
+          () => MerkleKVConfig(
+            clientId: 'test-client',
+            nodeId: 'test-node',
+            mqttHost: '', // Empty host
+          ),
+          throwsA(isA<InvalidConfigException>()),
         );
-        
-        // Client creation should still work, connection will fail
-        expect(() => MqttClientImpl(invalidConfig), returnsNormally);
       });
 
       test('disconnect without connection', () async {

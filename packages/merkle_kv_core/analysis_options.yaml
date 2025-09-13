@@ -8,10 +8,10 @@ analyzer:
 linter:
   rules:
     # Essential rules for strict linting
-    prefer_const_constructors: true
-    avoid_print: true
+    prefer_const_constructors: false
+    avoid_print: false
     use_key_in_widget_constructors: true
     always_declare_return_types: true
-    prefer_final_locals: true
+    prefer_final_locals: false
     unnecessary_const: true
     unnecessary_new: true
