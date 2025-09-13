@@ -70,8 +70,6 @@ class MockMqttClient implements MqttClientInterface {
 
   @override
   Future<void> connect() async {
-    print('MockClient connect() called, shouldFailConnection: $shouldFailConnection');
-    
     // Always emit connecting state first
     setState(ConnectionState.connecting);
     
@@ -185,7 +183,6 @@ void main() {
       test('successful connection emits correct state events', () async {
         final events = <ConnectionStateEvent>[];
         final subscription = manager.connectionState.listen((event) {
-          print('Test received event: ${event.state} - ${event.reason}');
           events.add(event);
         });
 
@@ -196,11 +193,6 @@ void main() {
 
         // Wait for all events to be processed and captured
         await Future.delayed(TestTimings.eventProcessingDelay);
-
-        print('Total events received: ${events.length}');
-        for (int i = 0; i < events.length; i++) {
-          print('Event $i: ${events[i].state} - ${events[i].reason}');
-        }
 
         // Should have at least connecting event and connected event
         expect(events.length, greaterThanOrEqualTo(2), 
@@ -227,7 +219,6 @@ void main() {
         
         final events = <ConnectionStateEvent>[];
         final subscription = manager.connectionState.listen((event) {
-          print('Failure test received event: ${event.state} - ${event.reason}');
           events.add(event);
         });
 
@@ -241,11 +232,6 @@ void main() {
 
         // Wait for all events to be processed
         await Future.delayed(TestTimings.eventProcessingDelay);
-
-        print('Failure test total events received: ${events.length}');
-        for (int i = 0; i < events.length; i++) {
-          print('Failure Event $i: ${events[i].state} - ${events[i].reason}');
-        }
 
         // Should have at least connecting and disconnected events
         expect(events.length, greaterThanOrEqualTo(2), 
@@ -271,7 +257,6 @@ void main() {
         
         final events = <ConnectionStateEvent>[];
         final subscription = manager.connectionState.listen((event) {
-          print('Timeout test received event: ${event.state} - ${event.reason}');
           events.add(event);
         });
 
@@ -286,11 +271,6 @@ void main() {
 
         // Wait for all events to be processed
         await Future.delayed(TestTimings.eventProcessingDelay);
-
-        print('Timeout test total events received: ${events.length}');
-        for (int i = 0; i < events.length; i++) {
-          print('Timeout Event $i: ${events[i].state} - ${events[i].reason}');
-        }
 
         // Should have timeout event or connection failed event
         final hasTimeoutEvent = events.any((e) => 
