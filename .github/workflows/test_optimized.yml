@@ -1,0 +1,116 @@
+name: Tests
+on: 
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'packages/merkle_kv_core/**'
+      - '.github/workflows/test.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'packages/merkle_kv_core/**'
+      - '.github/workflows/test.yml'
+
+jobs:
+  unit:
+    name: Unit Tests & Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/merkle_kv_core
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.9.3'
+          
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            packages/merkle_kv_core/.dart_tool
+          key: ${{ runner.os }}-dart-${{ hashFiles('packages/merkle_kv_core/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-dart-
+            
+      - name: Install dependencies
+        run: dart pub get
+        
+      - name: Verify dependencies
+        run: dart pub deps
+        
+      - name: Run static analysis
+        run: dart analyze --fatal-warnings
+        
+      - name: Check code formatting
+        run: dart format --output=none --set-exit-if-changed .
+        
+      - name: Run unit tests
+        run: dart test test/unit/ --reporter=github --coverage=coverage
+        
+      - name: Generate coverage report
+        run: |
+          dart pub global activate coverage
+          dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage.lcov --report-on=lib
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: packages/merkle_kv_core/coverage.lcov
+          flags: unittests
+          name: merkle-kv-core
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/merkle_kv_core
+    env:
+      MQTT_HOST: 127.0.0.1
+      MQTT_PORT: 1883
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.9.3'
+          
+      - name: Start MQTT broker
+        run: |
+          docker run -d --name mosquitto \
+            -p 1883:1883 \
+            -v /tmp/mosquitto.conf:/mosquitto/config/mosquitto.conf \
+            eclipse-mosquitto:2.0
+          echo "listener 1883" > /tmp/mosquitto.conf
+          echo "allow_anonymous true" >> /tmp/mosquitto.conf
+          docker exec mosquitto mosquitto_pub -h localhost -t test -m "broker ready"
+          
+      - name: Wait for MQTT broker
+        run: |
+          for i in {1..30}; do
+            if nc -z 127.0.0.1 1883 2>/dev/null; then
+              echo "✅ MQTT broker is ready"
+              break
+            fi
+            echo "Waiting for MQTT broker... ($i/30)"
+            sleep 2
+          done
+          
+      - name: Install dependencies
+        run: dart pub get
+        
+      - name: Run integration tests
+        run: dart test test/integration/ --reporter=github
+        
+      - name: Stop MQTT broker
+        if: always()
+        run: docker stop mosquitto && docker rm mosquitto

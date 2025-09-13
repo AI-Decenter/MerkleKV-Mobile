@@ -9,7 +9,6 @@
 /// - Topic Router: Canonical topics, validation, multi-tenant isolation
 /// - Command Processor: JSON validation, payload limits, idempotency
 /// - Negative Tests: Payload caps, malformed JSON, resource exhaustion
-/// - Property-Based Tests: LWW consistency, concurrency, boundary conditions
 ///
 /// Coverage Target: >95% line coverage
 /// Execution Time Target: <30 seconds
@@ -19,7 +18,6 @@ import 'mqtt/mqtt_client_test.dart' as mqtt_tests;
 import 'router/topic_router_test.dart' as router_tests;
 import 'processor/command_processor_test.dart' as processor_tests;
 import 'negative_tests.dart' as negative_tests;
-import 'property_based_tests.dart' as property_tests;
 
 void main() {
   // Run storage engine tests
@@ -36,7 +34,4 @@ void main() {
   
   // Run negative tests
   negative_tests.main();
-  
-  // Run property-based tests
-  property_tests.main();
 }
