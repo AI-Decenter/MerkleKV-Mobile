@@ -9,9 +9,9 @@ void main() {
 
   setUp(() async {
     config = MerkleKVConfig(
-      clientId: 'test-client',
-      nodeId: 'test-node',
-      mqttHost: 'test.example.com',
+      clientId: 'storage-test-client',
+      nodeId: 'storage-test-node',
+      mqttHost: 'localhost',
     );
     storage = InMemoryStorage(config);
     await storage.initialize();

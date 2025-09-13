@@ -39,7 +39,7 @@ void main() {
       clientId: 'test-client',
       nodeId: 'test-node',
       topicPrefix: 'merkle/v1',
-      mqttHost: 'test.example.com',
+      mqttHost: 'localhost',
       mqttPort: 1883,
     );
     
@@ -76,7 +76,7 @@ void main() {
         final specialConfig = MerkleKVConfig(
           clientId: 'special-client',
           nodeId: 'special-node',
-          mqttHost: 'test.example.com',
+          mqttHost: 'localhost',
           topicPrefix: 'app/环境/test',
         );
         
