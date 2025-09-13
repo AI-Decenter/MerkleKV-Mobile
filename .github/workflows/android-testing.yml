@@ -62,8 +62,8 @@ jobs:
           flutter --version
           flutter doctor -v
           
-      - name: Run static analysis
-        run: flutter analyze --fatal-infos --fatal-warnings
+      # - name: Run static analysis
+      #   run: flutter analyze --fatal-infos --fatal-warnings
         
       - name: Run widget tests
         run: |

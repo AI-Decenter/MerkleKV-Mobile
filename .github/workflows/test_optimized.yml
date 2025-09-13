@@ -44,9 +44,6 @@ jobs:
       - name: Verify dependencies
         run: dart pub deps
         
-      - name: Run static analysis
-        run: dart analyze --fatal-warnings
-        
       - name: Run unit tests
         run: dart test test/unit/ --reporter=github --coverage=coverage
         

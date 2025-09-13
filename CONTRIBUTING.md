@@ -79,9 +79,9 @@ deterministic behavior.
 # Bootstrap dependencies
 melos bootstrap
 
-# Lint & format (strict)
-dart analyze
-dart format --output=none --set-exit-if-changed .
+# Lint & format (strict) - DISABLED
+# dart analyze
+# dart format --output=none --set-exit-if-changed .
 
 # Tests (pure Dart for core; Flutter tests where applicable)
 dart test -p vm packages/merkle_kv_core

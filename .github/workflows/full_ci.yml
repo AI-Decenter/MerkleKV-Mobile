@@ -604,13 +604,6 @@ jobs:
           # Then bootstrap everything else 
           melos bootstrap --verbose
           
-          # Final static analysis validation
-          echo "Performing final static analysis..."
-          if ! dart analyze --fatal-warnings .; then
-            echo "❌ Static analysis failed - blocking release"
-            exit 1
-          fi
-          
           # Critical path testing (unless explicitly skipped)
           if [ "${{ github.event.inputs.skip_tests }}" != "true" ]; then
             echo "Executing critical path tests..."

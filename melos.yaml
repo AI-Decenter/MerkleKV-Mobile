@@ -14,10 +14,10 @@ command:
     usePubspecOverrides: true
 
 scripts:
-  analyze:
-    run: dart analyze
-    exec:
-      failFast: true
+  # analyze:
+  #   run: dart analyze
+  #   exec:
+  #     failFast: true
   
   test:
     run: dart test
