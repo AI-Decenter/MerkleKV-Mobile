@@ -393,6 +393,15 @@ String _generateTestId() {
 /// - MQTT_TLS: Enable TLS (default: false)
 /// - IT_REQUIRE_BROKER: Require broker availability (default: false)
 void main() {
+  // Skip all integration tests if running in CI without proper setup
+  if (Platform.environment['CI'] == 'true' && Platform.environment['MQTT_TEST_HOST'] == null) {
+    test('Integration tests skipped in CI', () {
+      print('Skipping replication integration tests in CI environment');
+      print('Set MQTT_TEST_HOST environment variable to enable integration tests');
+    });
+    return;
+  }
+  
   group('Replication Event Publisher Integration Tests', () {
     guardedTest('should publish and receive replication events', (a) async {
       final cfg = MqttTestConfig.fromEnv();

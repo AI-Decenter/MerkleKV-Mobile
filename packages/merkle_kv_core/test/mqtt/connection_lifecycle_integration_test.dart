@@ -30,6 +30,15 @@ class IntegrationTestTimings {
 /// - MQTT_TEST_PASSWORD (optional)
 /// - MQTT_TEST_USE_TLS (default: false)
 void main() {
+  // Skip all integration tests if running in CI without proper setup
+  if (Platform.environment['CI'] == 'true' && Platform.environment['MQTT_TEST_HOST'] == null) {
+    test('Integration tests skipped in CI', () {
+      print('Skipping MQTT integration tests in CI environment');
+      print('Set MQTT_TEST_HOST environment variable to enable integration tests');
+    });
+    return;
+  }
+  
   // Check if broker is available
   final host = Platform.environment['MQTT_TEST_HOST'] ?? 'localhost';
   final port = int.tryParse(Platform.environment['MQTT_TEST_PORT'] ?? '1883') ?? 1883;
@@ -40,16 +49,19 @@ void main() {
   group('ConnectionLifecycleManager Integration Tests', () {
     late MerkleKVConfig config;
     late InMemoryReplicationMetrics metrics;
+    late bool brokerAvailable;
     
     setUpAll(() async {
       // Verify broker is accessible
       try {
         final socket = await Socket.connect(host, port, timeout: IntegrationTestTimings.brokerConnectTimeout);
         await socket.close();
+        brokerAvailable = true;
       } catch (e) {
         print('MQTT broker not available at $host:$port');
         print('Skipping integration tests. Error: $e');
         print('To run integration tests, ensure MQTT broker is running and set environment variables.');
+        brokerAvailable = false;
         return;
       }
     });
