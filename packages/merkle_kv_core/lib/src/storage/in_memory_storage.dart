@@ -65,9 +65,16 @@ class InMemoryStorage implements StorageInterface {
       );
     }
 
-    // Apply Last-Write-Wins conflict resolution
+    // Apply deduplication and Last-Write-Wins conflict resolution
     final existingEntry = _entries[key];
     if (existingEntry != null) {
+      // Check for sequence-based deduplication: same (nodeId, seq) pair
+      if (existingEntry.nodeId == entry.nodeId && existingEntry.seq == entry.seq) {
+        // Duplicate sequence from same node - ignore
+        return;
+      }
+      
+      // Apply Last-Write-Wins conflict resolution
       if (existingEntry.winsOver(entry)) {
         // Existing entry wins, ignore the put operation
         return;

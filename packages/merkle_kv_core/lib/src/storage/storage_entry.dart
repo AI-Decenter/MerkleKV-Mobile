@@ -78,9 +78,9 @@ class StorageEntry {
   /// Returns:
   /// - positive if this entry wins over [other]
   /// - negative if [other] wins over this entry
-  /// - 0 if entries are equivalent (same timestamp and nodeId)
+  /// - 0 if entries are equivalent (same timestamp, nodeId, and seq)
   ///
-  /// LWW ordering: (timestampMs, nodeId) with lexicographic tiebreaker.
+  /// LWW ordering: (timestampMs, nodeId, seq) with lexicographic tiebreaker.
   int compareVersions(StorageEntry other) {
     // Compare timestamps first
     final timestampComparison = timestampMs.compareTo(other.timestampMs);
@@ -89,7 +89,13 @@ class StorageEntry {
     }
 
     // If timestamps are equal, compare nodeId lexicographically
-    return nodeId.compareTo(other.nodeId);
+    final nodeComparison = nodeId.compareTo(other.nodeId);
+    if (nodeComparison != 0) {
+      return nodeComparison;
+    }
+
+    // If timestamps and nodeIds are equal, compare sequence numbers
+    return seq.compareTo(other.seq);
   }
 
   /// Returns true if this entry wins over [other] in LWW conflict resolution.

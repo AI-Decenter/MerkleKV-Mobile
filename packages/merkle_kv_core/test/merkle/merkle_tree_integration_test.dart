@@ -1,3 +1,4 @@
+@Tags(['integration'])
 import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:merkle_kv_core/merkle_kv_core.dart';

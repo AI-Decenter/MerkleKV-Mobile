@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:logging/logging.dart';
 
 import 'lib/src/config/merkle_kv_config.dart';
 import 'lib/src/mqtt/connection_lifecycle.dart';
 import 'lib/src/mqtt/connection_state.dart';
 import 'lib/src/mqtt/mqtt_client_interface.dart';
 import 'lib/src/replication/metrics.dart';
+
+final _logger = Logger('TestRunner');
 
 /// Mock MQTT client for testing.
 class MockMqttClient implements MqttClientInterface {
@@ -60,7 +63,7 @@ class MockMqttClient implements MqttClientInterface {
 
   @override
   Future<void> connect() async {
-    print('MockClient connect() called, shouldFailConnection: $shouldFailConnection');
+    _logger.info('MockClient connect() called, shouldFailConnection: $shouldFailConnection');
     
     // Always emit connecting state first
     setState(ConnectionState.connecting);
@@ -140,7 +143,7 @@ class MockMqttClient implements MqttClientInterface {
 }
 
 Future<void> testBasicConnection() async {
-  print('🧪 Testing basic connection...');
+  _logger.info('🧪 Testing basic connection...');
   
   final config = MerkleKVConfig(
     mqttHost: 'test.example.com',
@@ -164,12 +167,12 @@ Future<void> testBasicConnection() async {
   try {
     await manager.connect();
     
-    print('✅ Connection successful');
-    print('✅ isConnected: ${manager.isConnected}');
-    print('✅ Events received: ${events.length}');
+    _logger.info('✅ Connection successful');
+    _logger.info('✅ isConnected: ${manager.isConnected}');
+    _logger.info('✅ Events received: ${events.length}');
     
     for (int i = 0; i < events.length; i++) {
-      print('   Event $i: ${events[i].state} - ${events[i].reason}');
+      _logger.info('   Event $i: ${events[i].state} - ${events[i].reason}');
     }
     
     assert(manager.isConnected, 'Should be connected');
@@ -185,7 +188,7 @@ Future<void> testBasicConnection() async {
 }
 
 Future<void> testConnectionTimeout() async {
-  print('\n🧪 Testing connection timeout...');
+  _logger.info('\n🧪 Testing connection timeout...');
   
   final config = MerkleKVConfig(
     mqttHost: 'test.example.com',
@@ -206,7 +209,7 @@ Future<void> testConnectionTimeout() async {
 
   final events = <ConnectionStateEvent>[];
   final subscription = manager.connectionState.listen((event) {
-    print('Timeout test event: ${event.state} - ${event.reason}');
+    _logger.info('Timeout test event: ${event.state} - ${event.reason}');
     events.add(event);
   });
 
@@ -216,17 +219,17 @@ Future<void> testConnectionTimeout() async {
       await manager.connect();
     } catch (e) {
       threwException = true;
-      print('✅ Connect threw exception as expected: $e');
+      _logger.info('✅ Connect threw exception as expected: $e');
     }
     
     assert(threwException, 'Connection should have thrown timeout exception');
     assert(!manager.isConnected, 'Should not be connected');
     
-    print('✅ Connection timeout handled properly');
-    print('✅ Events received: ${events.length}');
+    _logger.info('✅ Connection timeout handled properly');
+    _logger.info('✅ Events received: ${events.length}');
     
     for (int i = 0; i < events.length; i++) {
-      print('   Event $i: ${events[i].state} - ${events[i].reason}');
+      _logger.info('   Event $i: ${events[i].state} - ${events[i].reason}');
     }
     
   } finally {
@@ -237,7 +240,7 @@ Future<void> testConnectionTimeout() async {
 }
 
 Future<void> testConnectionFailure() async {
-  print('\n🧪 Testing connection failure...');
+  _logger.info('\n🧪 Testing connection failure...');
   
   final config = MerkleKVConfig(
     mqttHost: 'test.example.com',
@@ -259,7 +262,7 @@ Future<void> testConnectionFailure() async {
 
   final events = <ConnectionStateEvent>[];
   final subscription = manager.connectionState.listen((event) {
-    print('Failure test event: ${event.state} - ${event.reason}');
+    _logger.info('Failure test event: ${event.state} - ${event.reason}');
     events.add(event);
   });
 
@@ -269,17 +272,17 @@ Future<void> testConnectionFailure() async {
       await manager.connect();
     } catch (e) {
       threwException = true;
-      print('✅ Connect threw exception as expected: $e');
+      _logger.info('✅ Connect threw exception as expected: $e');
     }
     
     assert(threwException, 'Connection should have thrown exception');
     assert(!manager.isConnected, 'Should not be connected');
     
-    print('✅ Connection failure handled properly');
-    print('✅ Events received: ${events.length}');
+    _logger.info('✅ Connection failure handled properly');
+    _logger.info('✅ Events received: ${events.length}');
     
     for (int i = 0; i < events.length; i++) {
-      print('   Event $i: ${events[i].state} - ${events[i].reason}');
+      _logger.info('   Event $i: ${events[i].state} - ${events[i].reason}');
     }
     
     // Check for error indicators
@@ -288,8 +291,8 @@ Future<void> testConnectionFailure() async {
       e.reason?.contains('failed') == true || 
       e.reason?.contains('error') == true);
     
-    print('✅ Error events: ${errorEvents.length}');
-    print('✅ Failure events: ${failureEvents.length}');
+    _logger.info('✅ Error events: ${errorEvents.length}');
+    _logger.info('✅ Failure events: ${failureEvents.length}');
     
   } finally {
     await subscription.cancel();
@@ -299,17 +302,25 @@ Future<void> testConnectionFailure() async {
 }
 
 Future<void> main() async {
-  print('🚀 Starting Connection Lifecycle Tests\n');
+  // Configure logging
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    // Use print here for output, but only in the logging handler
+    // ignore: avoid_print
+    print('${record.level.name}: ${record.time}: ${record.message}');
+  });
+
+  _logger.info('🚀 Starting Connection Lifecycle Tests\n');
   
   try {
     await testBasicConnection();
     await testConnectionTimeout();
     await testConnectionFailure();
     
-    print('\n✅ All tests passed! MockMqttClient fixes are working correctly.');
+    _logger.info('\n✅ All tests passed! MockMqttClient fixes are working correctly.');
   } catch (e, stackTrace) {
-    print('\n❌ Test failed: $e');
-    print('Stack trace: $stackTrace');
+    _logger.severe('\n❌ Test failed: $e');
+    _logger.severe('Stack trace: $stackTrace');
     exit(1);
   }
 }

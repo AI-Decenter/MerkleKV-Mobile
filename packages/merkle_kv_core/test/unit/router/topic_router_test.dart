@@ -2,8 +2,10 @@ import 'package:test/test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:merkle_kv_core/src/mqtt/topic_router.dart';
 import 'package:merkle_kv_core/src/mqtt/topic_validator.dart';
+import 'package:merkle_kv_core/src/mqtt/connection_state.dart';
 import 'package:merkle_kv_core/src/config/merkle_kv_config.dart';
 import 'topic_router_test.mocks.dart';
+import 'dart:async';
 
 void main() {
   late TopicRouterImpl topicRouter;
@@ -21,6 +23,11 @@ void main() {
     );
     
     mockMqttClient = MockMqttClientInterface();
+    
+    // Stub the connectionState property to return a valid Stream
+    when(mockMqttClient.connectionState)
+        .thenAnswer((_) => Stream<ConnectionState>.empty());
+    
     topicValidator = TopicValidator();
     topicRouter = TopicRouterImpl(config, mockMqttClient);
   });

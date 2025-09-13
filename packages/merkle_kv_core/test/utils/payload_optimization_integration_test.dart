@@ -1,3 +1,4 @@
+@Tags(['integration'])
 import 'dart:convert';
 import 'dart:math';
 
