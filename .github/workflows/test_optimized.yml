@@ -1,15 +1,15 @@
 name: Tests
-on: 
+on:
   push:
     branches: [ main, develop ]
     paths:
       - 'packages/merkle_kv_core/**'
-      - '.github/workflows/test.yml'
+      - '.github/workflows/test_optimized.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'packages/merkle_kv_core/**'
-      - '.github/workflows/test.yml'
+      - '.github/workflows/test_optimized.yml'
 
 jobs:
   unit:
@@ -84,33 +84,64 @@ jobs:
         with:
           sdk: '3.9.3'
           
+      - name: Create MQTT broker configuration
+        run: |
+          echo "listener 1883" > /tmp/mosquitto.conf
+          echo "allow_anonymous true" >> /tmp/mosquitto.conf
+          echo "log_dest stdout" >> /tmp/mosquitto.conf
+          cat /tmp/mosquitto.conf
+          
       - name: Start MQTT broker
         run: |
           docker run -d --name mosquitto \
             -p 1883:1883 \
             -v /tmp/mosquitto.conf:/mosquitto/config/mosquitto.conf \
             eclipse-mosquitto:2.0
-          echo "listener 1883" > /tmp/mosquitto.conf
-          echo "allow_anonymous true" >> /tmp/mosquitto.conf
-          docker exec mosquitto mosquitto_pub -h localhost -t test -m "broker ready"
           
-      - name: Wait for MQTT broker
+      - name: Wait for MQTT broker to be ready
         run: |
+          echo "Waiting for MQTT broker to start..."
           for i in {1..30}; do
             if nc -z 127.0.0.1 1883 2>/dev/null; then
-              echo "✅ MQTT broker is ready"
+              echo "✅ MQTT broker is ready on port 1883"
+              # Test with mosquitto_pub to ensure broker is fully functional
+              docker exec mosquitto mosquitto_pub -h localhost -t test -m "broker ready" && echo "✅ MQTT broker is functional"
               break
             fi
             echo "Waiting for MQTT broker... ($i/30)"
             sleep 2
           done
           
+          # Final check
+          if ! nc -z 127.0.0.1 1883; then
+            echo "❌ MQTT broker failed to start"
+            docker logs mosquitto
+            exit 1
+          fi
+          
+      - name: Show MQTT broker status
+        run: |
+          echo "MQTT Broker Status:"
+          docker ps | grep mosquitto
+          echo "MQTT Broker Logs:"
+          docker logs mosquitto | tail -10
+          
       - name: Install dependencies
         run: dart pub get
         
-      - name: Run integration tests
-        run: dart test test/integration/ --reporter=github
+      - name: Run integration tests with increased timeouts
+        run: |
+          # Set longer timeouts for CI environment
+          export MQTT_CONNECT_TIMEOUT=10
+          export MQTT_TEST_TIMEOUT=15
+          dart test test/integration/ --reporter=github --timeout=60s
         
+      - name: Show MQTT broker logs on failure
+        if: failure()
+        run: |
+          echo "MQTT Broker Logs (last 50 lines):"
+          docker logs mosquitto | tail -50
+          
       - name: Stop MQTT broker
         if: always()
         run: docker stop mosquitto && docker rm mosquitto
