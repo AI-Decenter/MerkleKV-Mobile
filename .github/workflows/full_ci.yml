@@ -195,6 +195,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dart-
             
+      - name: 🧹 Clean Build Artifacts
+        run: |
+          echo "Cleaning stale build artifacts..."
+          find . -name ".dart_tool" -type d -exec rm -rf {} + 2>/dev/null || true
+          find . -name "build" -type d -exec rm -rf {} + 2>/dev/null || true
+          find . -name ".packages" -type f -delete 2>/dev/null || true
+          echo "✅ Build artifacts cleaned"
+            
       - name: 🔧 Install Dependencies
         run: |
           dart pub global activate melos
@@ -606,6 +614,12 @@ jobs:
       - name: 🔍 Execute Pre-Release Quality Gates
         run: |
           echo "Executing comprehensive pre-release validation..."
+          
+          # Clean stale artifacts first
+          echo "Cleaning build artifacts..."
+          find . -name ".dart_tool" -type d -exec rm -rf {} + 2>/dev/null || true
+          find . -name "build" -type d -exec rm -rf {} + 2>/dev/null || true
+          find . -name ".packages" -type f -delete 2>/dev/null || true
           
           # Install and bootstrap dependencies
           dart pub global activate melos

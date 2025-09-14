@@ -38,6 +38,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dart-
             
+      - name: Clean build artifacts
+        run: |
+          rm -rf packages/merkle_kv_core/.dart_tool
+          rm -rf packages/merkle_kv_core/build
+          rm -rf packages/merkle_kv_core/.packages
+          
       - name: Install dependencies
         run: dart pub get
         
