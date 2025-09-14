@@ -74,9 +74,9 @@ class MockMqttClient implements MqttClientInterface {
     }
     
     if (shouldFailConnection) {
-      // Wait a bit then emit disconnected state
+      // Wait a bit to simulate connection attempt, then throw without setting disconnected
+      // Let the lifecycle manager handle the state transition
       await Future.delayed(Duration(milliseconds: 20));
-      setState(ConnectionState.disconnected);
       throw connectionException ?? Exception('Connection failed');
     }
     

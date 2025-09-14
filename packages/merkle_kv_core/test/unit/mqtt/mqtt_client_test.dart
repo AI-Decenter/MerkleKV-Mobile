@@ -31,8 +31,7 @@ class MockMqttClientUnit implements MqttClientInterface {
     await Future.delayed(Duration(milliseconds: 10)); // Simulate async operation
     
     if (shouldFailConnection) {
-      _currentState = ConnectionState.disconnected;
-      _stateController!.add(_currentState);
+      // Don't emit disconnected state - let the lifecycle manager handle it
       throw connectionException ?? Exception('Mock connection failed');
     }
     

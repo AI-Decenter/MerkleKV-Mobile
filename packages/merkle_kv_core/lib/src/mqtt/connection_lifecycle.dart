@@ -211,9 +211,10 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
       if (reason == DisconnectionReason.timeout) {
         _handleConnectionTimeout();
       } else {
+        final reasonText = _getReasonText(reason);
         _updateState(
           ConnectionState.disconnected,
-          reason: 'Connection failed: $reason',
+          reason: 'Connection failed: $reasonText',
           error: e is Exception ? e : Exception(e.toString()),
         );
       }
@@ -360,7 +361,7 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
     
     _updateState(
       ConnectionState.disconnected,
-      reason: 'Connection timeout',
+      reason: 'Connection failed: timeout',
       error: Exception('Connection timeout after ${_config.keepAliveSeconds * 2} seconds'),
     );
   }
@@ -450,6 +451,26 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
       return DisconnectionReason.networkError;
     } else {
       return DisconnectionReason.brokerClose;
+    }
+  }
+
+  /// Convert disconnection reason to human-readable text.
+  String _getReasonText(DisconnectionReason reason) {
+    switch (reason) {
+      case DisconnectionReason.timeout:
+        return 'timeout';
+      case DisconnectionReason.networkError:
+        return 'network error';
+      case DisconnectionReason.authFailure:
+        return 'authentication failure';
+      case DisconnectionReason.brokerClose:
+        return 'broker closed connection';
+      case DisconnectionReason.manual:
+        return 'manual disconnection';
+      case DisconnectionReason.configChange:
+        return 'configuration change';
+      case DisconnectionReason.appLifecycle:
+        return 'app lifecycle change';
     }
   }
 
