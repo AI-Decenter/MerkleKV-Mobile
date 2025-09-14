@@ -158,7 +158,7 @@ void main() {
 
     setUp(() {
       config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         keepAliveSeconds: 5,
@@ -609,7 +609,7 @@ void main() {
     group('Configuration integration', () {
       test('uses correct keep-alive timeout', () async {
         final shortConfig = MerkleKVConfig(
-          mqttHost: 'test.example.com',
+          mqttHost: 'localhost',
           nodeId: 'test-node',
           clientId: 'test-client',
           keepAliveSeconds: 1, // Very short for testing

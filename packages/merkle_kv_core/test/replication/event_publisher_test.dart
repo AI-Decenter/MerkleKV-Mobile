@@ -81,7 +81,7 @@ void main() {
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('merkle_kv_test_');
       config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         storagePath: '${tempDir.path}/test.storage',
@@ -396,7 +396,7 @@ void main() {
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('merkle_kv_test_');
       config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         storagePath: '${tempDir.path}/test.storage',
@@ -488,7 +488,7 @@ void main() {
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('merkle_kv_test_');
       config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         storagePath: '${tempDir.path}/test.storage',
@@ -626,7 +626,7 @@ void main() {
 
       // Create a test config without persistence to speed up the test
       final testConfig = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         storagePath: '${tempDir.path}/limit_test.storage',

@@ -73,7 +73,7 @@ void main() {
 
     test('SequenceManager persistence across restarts', () async {
       final config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         storagePath: '${tempDir.path}/sequences',
@@ -110,7 +110,7 @@ void main() {
 
     test('OutboxQueue persistence and ordering', () async {
       final config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         storagePath: '${tempDir.path}/outbox',

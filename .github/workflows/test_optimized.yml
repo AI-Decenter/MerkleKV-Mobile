@@ -126,9 +126,10 @@ jobs:
           
       - name: Create MQTT broker configuration
         run: |
-          echo "listener 1883" > /tmp/mosquitto.conf
+          echo "listener 1883 0.0.0.0" > /tmp/mosquitto.conf
           echo "allow_anonymous true" >> /tmp/mosquitto.conf
           echo "log_dest stdout" >> /tmp/mosquitto.conf
+          echo "log_type all" >> /tmp/mosquitto.conf
           cat /tmp/mosquitto.conf
           
       - name: Start MQTT broker
@@ -163,7 +164,13 @@ jobs:
           
           # Test with verbose mosquitto_pub to ensure broker is fully functional
           echo "Testing MQTT broker connectivity..."
+          echo "Checking container status before test:"
+          docker ps | grep mosquitto
+          echo "Checking container logs before test:"
+          docker logs mosquitto | tail -10 || echo "Cannot get logs"
+          
           for attempt in 1 2 3; do
+            echo "Connectivity test attempt $attempt/3..."
             if docker exec mosquitto mosquitto_pub -d -h localhost -t test -m "broker ready"; then
               echo "✅ MQTT broker is functional (attempt $attempt)"
               break

@@ -12,7 +12,7 @@ void main() {
 
     setUp(() async {
       config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
         skewMaxFutureMs: 300000, // 5 minutes
@@ -701,7 +701,7 @@ void main() {
 
     setUp(() async {
       final config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
       );

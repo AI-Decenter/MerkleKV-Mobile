@@ -11,7 +11,7 @@ void main() {
 
     setUp(() async {
       config = MerkleKVConfig(
-        mqttHost: 'test.example.com',
+        mqttHost: 'localhost',
         nodeId: 'test-node',
         clientId: 'test-client',
       );
