@@ -430,7 +430,7 @@ void main() {
       });
     });
 
-    group('security warnings', () {
+    group('TLS security enforcement', () {
       late List<String> warnings;
 
       setUp(() {
@@ -442,42 +442,44 @@ void main() {
         MerkleKVConfig.setSecurityWarningHandler(null);
       });
 
-      test('triggers warning when credentials provided without TLS', () {
-        MerkleKVConfig(
-          mqttHost: 'localhost',
-          clientId: 'test-client',
-          nodeId: 'test-node',
-          mqttUseTls: false,
-          username: 'user',
-          password: 'pass',
+      test('throws error when credentials provided without TLS', () {
+        expect(
+          () => MerkleKVConfig(
+            mqttHost: 'localhost',
+            clientId: 'test-client',
+            nodeId: 'test-node',
+            mqttUseTls: false,
+            username: 'user',
+            password: 'pass',
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        expect(warnings, hasLength(1));
-        expect(warnings.first, contains('plain text'));
       });
 
-      test('triggers warning when only username provided without TLS', () {
-        MerkleKVConfig(
-          mqttHost: 'localhost',
-          clientId: 'test-client',
-          nodeId: 'test-node',
-          mqttUseTls: false,
-          username: 'user',
+      test('throws error when only username provided without TLS', () {
+        expect(
+          () => MerkleKVConfig(
+            mqttHost: 'localhost',
+            clientId: 'test-client',
+            nodeId: 'test-node',
+            mqttUseTls: false,
+            username: 'user',
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        expect(warnings, hasLength(1));
       });
 
-      test('triggers warning when only password provided without TLS', () {
-        MerkleKVConfig(
-          mqttHost: 'localhost',
-          clientId: 'test-client',
-          nodeId: 'test-node',
-          mqttUseTls: false,
-          password: 'pass',
+      test('throws error when only password provided without TLS', () {
+        expect(
+          () => MerkleKVConfig(
+            mqttHost: 'localhost',
+            clientId: 'test-client',
+            nodeId: 'test-node',
+            mqttUseTls: false,
+            password: 'pass',
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        expect(warnings, hasLength(1));
       });
 
       test('no warning when credentials provided with TLS', () {
@@ -628,6 +630,7 @@ void main() {
           mqttHost: 'localhost',
           clientId: 'test-client',
           nodeId: 'test-node',
+          mqttUseTls: true, // Enable TLS for credentials
           username: 'user',
           password: 'pass',
         );
@@ -648,6 +651,7 @@ void main() {
           mqttHost: 'example.com',
           clientId: 'test-client',
           nodeId: 'test-node',
+          mqttUseTls: true, // Enable TLS for credentials
           username: 'secret-user',
           password: 'secret-pass',
         );
