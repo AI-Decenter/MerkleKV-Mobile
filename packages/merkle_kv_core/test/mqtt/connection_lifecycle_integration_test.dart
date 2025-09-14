@@ -53,7 +53,7 @@ void main() {
         print('Skipping integration tests. Error: $e');
         print('To run integration tests, ensure MQTT broker is running and set environment variables.');
         brokerAvailable = false;
-        return;
+        // Don't return early - let tests run with skip conditions
       }
     });
 

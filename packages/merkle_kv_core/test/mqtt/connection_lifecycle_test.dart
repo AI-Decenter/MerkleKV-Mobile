@@ -148,12 +148,11 @@ class MockMqttClient implements MqttClientInterface {
 
 void main() {
   // Skip network-dependent tests in CI environment
-  if (Platform.environment.containsKey('CI') || Platform.environment.containsKey('GITHUB_ACTIONS')) {
-    print('Skipping MQTT connection lifecycle tests in CI environment');
-    return;
-  }
+  final skipReason = (Platform.environment.containsKey('CI') || Platform.environment.containsKey('GITHUB_ACTIONS')) 
+      ? 'Skipped in CI environment - no MQTT broker available' 
+      : null;
   
-  group('ConnectionLifecycleManager', () {
+  group('ConnectionLifecycleManager', skip: skipReason, () {
     late MerkleKVConfig config;
     late MockMqttClient mockClient;
     late InMemoryReplicationMetrics metrics;
