@@ -238,6 +238,10 @@ void main() {
         client.connectionException = Exception('Network error');
         
         expect(() async => await client.connect(), throwsA(isA<Exception>()));
+        
+        // Allow time for state changes to be processed
+        await Future.delayed(Duration(milliseconds: 20));
+        
         expect(client.currentState, equals(ConnectionState.disconnected));
         
         client.dispose();
