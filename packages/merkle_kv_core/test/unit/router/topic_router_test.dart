@@ -77,10 +77,10 @@ void main() {
           clientId: 'special-client',
           nodeId: 'special-node',
           mqttHost: 'localhost',
-          topicPrefix: 'app/环境/test',
+          topicPrefix: 'app/env-test/prod_1',  // Using valid characters: letters, numbers, underscore, hyphen, slash
         );
         
-        expect(specialConfig.topicPrefix, equals('app/环境/test'));
+        expect(specialConfig.topicPrefix, equals('app/env-test/prod_1'));
       });
 
       test('topic validation for multiple clients', () {

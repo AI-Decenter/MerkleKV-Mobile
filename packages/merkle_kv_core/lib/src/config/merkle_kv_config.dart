@@ -298,11 +298,11 @@ class MerkleKVConfig {
       );
     }
 
-    // Security warning for credentials without TLS
+    // Security validation: enforce TLS when credentials are provided
     if (!mqttUseTls && (username != null || password != null)) {
-      _onSecurityWarning?.call(
+      throw ArgumentError(
         'Username or password provided without TLS encryption. '
-        'Credentials will be transmitted in plain text.',
+        'TLS must be enabled (mqttUseTls: true) when using credentials for security.',
       );
     }
 
