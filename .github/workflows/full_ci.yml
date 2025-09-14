@@ -234,21 +234,31 @@ jobs:
           done
           
           # Give the broker additional time to fully initialize after port opens
-          echo "Waiting additional 5 seconds for broker initialization..."
-          sleep 5
+          echo "Waiting additional 15 seconds for broker initialization..."
+          sleep 15
           
           # Test broker connectivity with verbose logging and QoS 0 message
           echo "Testing MQTT broker connectivity..."
-          if mosquitto_pub -d -h 127.0.0.1 -p 1883 -t "test/connection" -m "test" --qos 0; then
-            echo "✅ MQTT broker connection successful"
-          else
-            echo "❌ MQTT broker connection failed"
-            echo "Checking broker status..."
-            docker ps | grep mosquitto || echo "No mosquitto container found"
-            echo "Checking port status..."
-            ss -tuln | grep :1883 || echo "Port 1883 not listening"
-            exit 1
-          fi
+          for attempt in 1 2 3; do
+            if mosquitto_pub -d -h 127.0.0.1 -p 1883 -t "test/connection" -m "test" --qos 0; then
+              echo "✅ MQTT broker connection successful (attempt $attempt)"
+              break
+            else
+              echo "❌ MQTT broker connection failed (attempt $attempt/3)"
+              if [ $attempt -eq 3 ]; then
+                echo "Checking broker status..."
+                docker ps | grep mosquitto || echo "No mosquitto container found"
+                echo "Checking port status..."
+                ss -tuln | grep :1883 || echo "Port 1883 not listening"
+                echo "Checking broker logs..."
+                docker logs --tail 50 mosquitto 2>/dev/null || echo "Cannot get broker logs"
+                exit 1
+              else
+                echo "Retrying in 5 seconds..."
+                sleep 5
+              fi
+            fi
+          done
           
       # -----------------------------------------------------------------------
       # Unit Testing Execution

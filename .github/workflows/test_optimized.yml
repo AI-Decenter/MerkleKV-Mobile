@@ -113,18 +113,27 @@ jobs:
           fi
           
           # Give the broker additional time to fully initialize after port opens
-          echo "Waiting additional 5 seconds for broker initialization..."
-          sleep 5
+          echo "Waiting additional 15 seconds for broker initialization..."
+          sleep 15
           
           # Test with verbose mosquitto_pub to ensure broker is fully functional
           echo "Testing MQTT broker connectivity..."
-          if docker exec mosquitto mosquitto_pub -d -h localhost -t test -m "broker ready"; then
-            echo "✅ MQTT broker is functional"
-          else
-            echo "❌ MQTT broker connection test failed"
-            docker logs mosquitto
-            exit 1
-          fi
+          for attempt in 1 2 3; do
+            if docker exec mosquitto mosquitto_pub -d -h localhost -t test -m "broker ready"; then
+              echo "✅ MQTT broker is functional (attempt $attempt)"
+              break
+            else
+              echo "❌ MQTT broker connection test failed (attempt $attempt/3)"
+              if [ $attempt -eq 3 ]; then
+                echo "Final attempt failed. Checking logs..."
+                docker logs mosquitto
+                exit 1
+              else
+                echo "Retrying in 5 seconds..."
+                sleep 5
+              fi
+            fi
+          done
           
       - name: Show MQTT broker status
         run: |
