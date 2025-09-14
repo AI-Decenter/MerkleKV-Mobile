@@ -165,7 +165,7 @@ jobs:
       - name: 🎯 Setup Dart SDK
         uses: dart-lang/setup-dart@v1
         with:
-          sdk: 'stable'
+          sdk: '3.3.4'  # Use a version with working test runner snapshots
           
       - name: 🔧 Verify Dart Installation
         run: |
@@ -204,9 +204,73 @@ jobs:
           export PATH="$PATH:/usr/lib/dart/bin"
           echo "/usr/lib/dart/bin" >> $GITHUB_PATH
           
+          # Fix the frontend_server.dart.snapshot issue
+          echo "Fixing frontend_server.dart.snapshot issue..."
+          if [ ! -f "/usr/lib/dart/bin/snapshots/frontend_server.dart.snapshot" ]; then
+            if [ -f "/usr/lib/dart/bin/snapshots/frontend_server_aot.dart.snapshot" ]; then
+              echo "Creating symlink for frontend_server.dart.snapshot..."
+              sudo ln -sf /usr/lib/dart/bin/snapshots/frontend_server_aot.dart.snapshot /usr/lib/dart/bin/snapshots/frontend_server.dart.snapshot || echo "Symlink creation failed"
+            fi
+          fi
+          
           # Verify new installation
           dart --version
           echo "Alternative Dart installation completed"
+          
+      - name: 🔧 Fix Dart SDK frontend_server Issue
+        run: |
+          echo "Checking and fixing frontend_server.dart.snapshot issue..."
+          DART_BIN=$(which dart)
+          SNAPSHOTS_DIR=$(dirname "$DART_BIN")/snapshots
+          
+          # For GitHub Actions hosted toolcache, the path might be different
+          if [[ "$DART_BIN" == *"hostedtoolcache"* ]]; then
+            SNAPSHOTS_DIR=$(dirname "$DART_BIN")/snapshots
+          elif [[ "$DART_BIN" == *"/usr/lib/dart"* ]]; then
+            SNAPSHOTS_DIR="/usr/lib/dart/bin/snapshots"
+          else
+            SNAPSHOTS_DIR=$(dirname "$DART_BIN")/snapshots
+          fi
+          
+          echo "Dart binary: $DART_BIN"
+          echo "Snapshots directory: $SNAPSHOTS_DIR"
+          
+          if [ -d "$SNAPSHOTS_DIR" ]; then
+            echo "Available snapshots:"
+            ls -la "$SNAPSHOTS_DIR"/frontend_server* || echo "No frontend_server snapshots found"
+            
+            # Check if the expected file exists and is the right type
+            if [ ! -f "$SNAPSHOTS_DIR/frontend_server.dart.snapshot" ] || file "$SNAPSHOTS_DIR/frontend_server.dart.snapshot" | grep -q "AOT"; then
+              echo "frontend_server.dart.snapshot missing or is AOT version"
+              
+              # Download the correct snapshot from Dart 3.3.4 which has working snapshots
+              echo "Downloading working frontend_server.dart.snapshot from Dart 3.3.4..."
+              wget -q "https://storage.googleapis.com/dart-archive/channels/stable/release/3.3.4/sdk/dartsdk-linux-x64-release.zip" -O /tmp/dart-fix.zip || echo "Download failed"
+              
+              if [ -f "/tmp/dart-fix.zip" ]; then
+                echo "Extracting frontend_server.dart.snapshot..."
+                unzip -q /tmp/dart-fix.zip "dart-sdk/bin/snapshots/frontend_server.dart.snapshot" -d /tmp/ || echo "Extraction failed"
+                if [ -f "/tmp/dart-sdk/bin/snapshots/frontend_server.dart.snapshot" ]; then
+                  # Remove symlink if it exists
+                  sudo rm -f "$SNAPSHOTS_DIR/frontend_server.dart.snapshot"
+                  sudo cp "/tmp/dart-sdk/bin/snapshots/frontend_server.dart.snapshot" "$SNAPSHOTS_DIR/" || echo "Copy failed"
+                  echo "✅ Working frontend_server.dart.snapshot installed"
+                fi
+                rm -rf /tmp/dart-fix.zip /tmp/dart-sdk/
+              fi
+            else
+              echo "✅ frontend_server.dart.snapshot already exists and is correct type"
+            fi
+          else
+            echo "❌ Snapshots directory not found"
+          fi
+          
+          # Final verification
+          echo "Final verification:"
+          if [ -f "$SNAPSHOTS_DIR/frontend_server.dart.snapshot" ]; then
+            file "$SNAPSHOTS_DIR/frontend_server.dart.snapshot"
+            ls -la "$SNAPSHOTS_DIR"/frontend_server*
+          fi
           
       - name: 🧹 Clean Dart Pub Cache
         run: |
@@ -349,8 +413,8 @@ jobs:
           # Verify Dart environment
           echo "Dart version:"
           dart --version
-          echo "Dart pub version:"
-          dart pub version
+          echo "Dart pub help:"
+          dart pub --help | head -5
           
           # Run tests directly in the merkle_kv_core package
           echo "Running unit tests for merkle_kv_core package..."
