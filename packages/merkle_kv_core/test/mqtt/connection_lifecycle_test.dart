@@ -57,13 +57,9 @@ class MockMqttClient implements MqttClientInterface {
   void setState(ConnectionState state) {
     if (_currentState != state) {
       _currentState = state;
-      // Use Future.microtask to ensure events are emitted after the current execution context
+      // Emit state change immediately for better test determinism
       if (_stateController != null && !_stateController!.isClosed) {
-        Future.microtask(() {
-          if (_stateController != null && !_stateController!.isClosed) {
-            _stateController!.add(state);
-          }
-        });
+        _stateController!.add(state);
       }
     }
   }

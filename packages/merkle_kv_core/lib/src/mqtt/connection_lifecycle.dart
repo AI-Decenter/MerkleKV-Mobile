@@ -186,7 +186,6 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
       await _mqttClient.connect().timeout(
         Duration(seconds: _config.keepAliveSeconds * 2),
         onTimeout: () {
-          _handleConnectionTimeout();
           throw Exception('Connection timeout after ${_config.keepAliveSeconds * 2} seconds');
         },
       );
@@ -208,11 +207,16 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
       _metrics?.recordConnectionLifecycleEvent('connection_failed');
       _metrics?.recordDisconnectionReasonMetric(reason);
       
-      _updateState(
-        ConnectionState.disconnected,
-        reason: 'Connection failed: $reason',
-        error: e is Exception ? e : Exception(e.toString()),
-      );
+      // Handle timeout specifically
+      if (reason == DisconnectionReason.timeout) {
+        _handleConnectionTimeout();
+      } else {
+        _updateState(
+          ConnectionState.disconnected,
+          reason: 'Connection failed: $reason',
+          error: e is Exception ? e : Exception(e.toString()),
+        );
+      }
       
       rethrow;
     }
