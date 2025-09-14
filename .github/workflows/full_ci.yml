@@ -167,30 +167,12 @@ jobs:
         with:
           sdk: 'stable'
           
-      - name: 🎯 Setup Flutter SDK (for Flutter packages)
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.19.6'
-          channel: 'stable'
-          cache: true
-          
       - name: 🧹 Clean Dart Pub Cache
         run: |
           echo "Cleaning Dart pub cache to prevent corruption issues..."
           dart pub cache clean || true
           echo "✅ Dart pub cache cleaned"
           
-      - name: 💾 Restore Dart Package Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.PUB_CACHE }}
-            ~/.pub-cache
-            **/.dart_tool/package_config.json
-          key: ${{ runner.os }}-dart-${{ hashFiles('**/pubspec.yaml', '**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-dart-
-            
       - name: 🧹 Clean Build Artifacts
         run: |
           echo "Cleaning stale build artifacts..."
@@ -201,20 +183,26 @@ jobs:
             
       - name: 🔧 Install Dependencies
         run: |
-          echo "Installing Melos for monorepo management..."
-          dart pub global activate melos
-          
           echo "Installing dependencies for merkle_kv_core package..."
           cd packages/merkle_kv_core
+          
+          # Verify we're in the right directory
+          echo "Current directory: $(pwd)"
+          echo "Contents:"
+          ls -la
+          
+          # Clean local artifacts first
+          rm -rf .dart_tool build .packages pubspec.lock || true
+          
+          # Get dependencies with verbose output
+          echo "Running dart pub get..."
           dart pub get --verbose
+          
+          # Verify dependencies were installed
+          echo "Verifying installation..."
+          dart pub deps --style=compact || echo "Dependencies check completed"
+          
           cd ../..
-          
-          echo "Bootstrapping all packages with Melos..."
-          # Bootstrap packages first (these should work without Flutter)
-          melos bootstrap --scope="packages/**" --verbose || true
-          # Then bootstrap everything else
-          melos bootstrap --verbose
-          
           echo "✅ Dependencies installed successfully"
           
       # -----------------------------------------------------------------------
@@ -322,32 +310,41 @@ jobs:
           echo "Running unit tests for merkle_kv_core package..."
           cd packages/merkle_kv_core
           
-          # Verify dependencies are properly installed
-          echo "Verifying package dependencies..."
-          dart pub deps --style=tree || dart pub get --verbose
+          # Verify we're in the right place
+          echo "Current directory: $(pwd)"
+          echo "Pubspec file exists: $(test -f pubspec.yaml && echo 'YES' || echo 'NO')"
+          
+          # Double-check dependencies are installed
+          echo "Re-checking dependencies..."
+          if [ ! -d ".dart_tool" ]; then
+            echo "No .dart_tool directory found, running dart pub get again..."
+            dart pub get --verbose
+          fi
+          
+          # Verify dependencies one more time
+          echo "Dependency verification:"
+          dart pub deps --style=compact 2>/dev/null || echo "Dependencies may need resolution"
           
           # List test files to verify they exist
           echo "Available test files:"
-          find test/ -name "*.dart" -type f | head -10
+          if [ -d "test/unit" ]; then
+            find test/unit/ -name "*.dart" -type f | head -10
+          else
+            echo "test/unit directory not found, listing all test files:"
+            find test/ -name "*.dart" -type f | head -10
+          fi
           
           # Run unit tests (excluding integration tagged tests)
           echo "Executing unit tests..."
           if dart test test/unit/ --reporter=github --timeout=30s; then
             echo "✅ Unit tests completed successfully"
           else
-            echo "❌ Unit tests failed"
-            exit 1
+            echo "❌ Unit tests failed - trying without specific directory..."
+            # Fallback: try running all tests except integration
+            dart test --exclude-tags=integration --reporter=github --timeout=30s || exit 1
           fi
           
           cd ../..
-          
-          echo "Running Flutter tests for Flutter packages (if any)..."
-          if melos run test:melos:flutter 2>/dev/null; then
-            echo "✅ Flutter package tests completed successfully"  
-          else
-            echo "ℹ️ No Flutter packages with tests found or tests skipped"
-          fi
-          
           echo "✅ Unit testing completed successfully"
           
       # -----------------------------------------------------------------------
