@@ -82,8 +82,14 @@ jobs:
       - name: Run unit tests
         working-directory: packages/merkle_kv_core
         run: |
-          echo "Running unit tests with verbose output..."
-          dart test test/unit/ --reporter=github --coverage=coverage --verbose
+          echo "Running unit tests..."
+          dart test test/unit/ --reporter=github
+          
+      - name: Run unit tests with coverage
+        working-directory: packages/merkle_kv_core
+        run: |
+          echo "Running unit tests with coverage..."
+          dart test test/unit/ --coverage=coverage
         
       - name: Generate coverage report
         working-directory: packages/merkle_kv_core
@@ -152,8 +158,8 @@ jobs:
           fi
           
           # Give the broker additional time to fully initialize after port opens
-          echo "Waiting additional 15 seconds for broker initialization..."
-          sleep 15
+          echo "Waiting additional 30 seconds for broker initialization..."
+          sleep 30
           
           # Test with verbose mosquitto_pub to ensure broker is fully functional
           echo "Testing MQTT broker connectivity..."
@@ -182,9 +188,11 @@ jobs:
           docker logs mosquitto | tail -10
           
       - name: Install dependencies
+        working-directory: packages/merkle_kv_core
         run: dart pub get
         
       - name: Run integration tests with real MQTT broker
+        working-directory: packages/merkle_kv_core
         run: |
           # Set environment for integration tests with real broker
           export MQTT_TEST_HOST=127.0.0.1

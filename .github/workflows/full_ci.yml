@@ -242,8 +242,8 @@ jobs:
           done
           
           # Give the broker additional time to fully initialize after port opens
-          echo "Waiting additional 15 seconds for broker initialization..."
-          sleep 15
+          echo "Waiting additional 30 seconds for broker initialization..."
+          sleep 30
           
           # Test broker connectivity with verbose logging and QoS 0 message
           echo "Testing MQTT broker connectivity..."
