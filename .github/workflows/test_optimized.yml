@@ -26,7 +26,7 @@ jobs:
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
         with:
-          sdk: '3.9.3'
+          sdk: 'stable'
           
       - name: Cache pub dependencies
         uses: actions/cache@v4
@@ -34,26 +34,59 @@ jobs:
           path: |
             ~/.pub-cache
             packages/merkle_kv_core/.dart_tool
-          key: ${{ runner.os }}-dart-${{ hashFiles('packages/merkle_kv_core/pubspec.lock') }}
+          key: ${{ runner.os }}-dart-v2-${{ hashFiles('packages/merkle_kv_core/pubspec.lock') }}
           restore-keys: |
-            ${{ runner.os }}-dart-
+            ${{ runner.os }}-dart-v2-
             
       - name: Clean build artifacts
         run: |
+          echo "Cleaning all build artifacts..."
           rm -rf packages/merkle_kv_core/.dart_tool
           rm -rf packages/merkle_kv_core/build
           rm -rf packages/merkle_kv_core/.packages
+          rm -rf packages/merkle_kv_core/pubspec.lock
+          echo "✅ Build artifacts cleaned"
           
       - name: Install dependencies
-        run: dart pub get
+        working-directory: packages/merkle_kv_core
+        run: |
+          echo "Installing dependencies with verbose output..."
+          dart pub get --verbose
+          echo "✅ Dependencies installed"
         
       - name: Verify dependencies
-        run: dart pub deps
+        working-directory: packages/merkle_kv_core
+        run: |
+          echo "Verifying dependencies..."
+          dart pub deps
+          echo "Checking dart SDK version..."
+          dart --version
+          echo "Checking test package availability..."
+          dart pub deps | grep test || echo "Test package not found!"
+          echo "✅ Dependencies verified"
+        
+      - name: Debug test environment
+        working-directory: packages/merkle_kv_core
+        run: |
+          echo "=== Debug Information ==="
+          echo "Current directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+          echo "Pubspec.yaml exists: $(test -f pubspec.yaml && echo 'YES' || echo 'NO')"
+          echo "Dart tool directory:"
+          ls -la .dart_tool/ || echo "No .dart_tool directory"
+          echo "Test directory contents:"
+          find test/ -name "*.dart" | head -5
+          echo "==========================="
         
       - name: Run unit tests
-        run: dart test test/unit/ --reporter=github --coverage=coverage
+        working-directory: packages/merkle_kv_core
+        run: |
+          echo "Running unit tests with verbose output..."
+          dart test test/unit/ --reporter=github --coverage=coverage --verbose
         
       - name: Generate coverage report
+        working-directory: packages/merkle_kv_core
         run: |
           dart pub global activate coverage
           dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage.lcov --report-on=lib
@@ -83,7 +116,7 @@ jobs:
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
         with:
-          sdk: '3.9.3'
+          sdk: 'stable'
           
       - name: Create MQTT broker configuration
         run: |
