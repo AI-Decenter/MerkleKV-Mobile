@@ -154,21 +154,6 @@ jobs:
       matrix:
         tier: [unit, integration]
       fail-fast: false  # Continue testing other tiers on failure
-      
-    # Service Containers for Integration Testing
-    # Real MQTT broker provides authentic testing environment while avoiding
-    # the complexity and maintenance overhead of extensive mocking strategies
-    services:
-      mosquitto:
-        image: eclipse-mosquitto:2.0
-        ports:
-          - 1883:1883
-          - 9001:9001
-        options: >-
-          --health-cmd "mosquitto_pub -h localhost -t health -m test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
         
     steps:
       - name: 📚 Checkout Repository
@@ -210,6 +195,32 @@ jobs:
           melos bootstrap --scope="packages/**" --verbose || true
           # Then bootstrap everything else
           melos bootstrap --verbose
+          
+      # -----------------------------------------------------------------------
+      # MQTT Broker Setup for Integration Tests
+      # -----------------------------------------------------------------------
+      # Starts MQTT broker with anonymous access for integration testing
+      #
+      - name: 🐳 Start MQTT Broker (Integration Tier)
+        if: matrix.tier == 'integration'
+        run: |
+          echo "Starting Mosquitto MQTT broker for integration tests..."
+          
+          # Create a basic mosquitto config that allows anonymous connections
+          cat > /tmp/mosquitto.conf << 'EOF'
+          listener 1883 0.0.0.0
+          allow_anonymous true
+          log_dest stdout
+          log_type all
+          EOF
+          
+          # Start Mosquitto container with the config
+          docker run -d --name mosquitto \
+            -p 1883:1883 \
+            -v /tmp/mosquitto.conf:/mosquitto/config/mosquitto.conf \
+            eclipse-mosquitto:2.0
+          
+          echo "✅ Mosquitto container started"
           
       # -----------------------------------------------------------------------
       # MQTT Broker Validation for Integration Tests
@@ -255,7 +266,7 @@ jobs:
               echo "❌ MQTT broker connection failed (attempt $attempt/3)"
               if [ $attempt -eq 3 ]; then
                 echo "Checking broker status..."
-                docker ps | grep mosquitto || echo "No mosquitto container found"
+                docker ps -a
                 echo "Checking port status..."
                 ss -tuln | grep :1883 || echo "Port 1883 not listening"
                 echo "Checking broker logs..."
@@ -342,6 +353,14 @@ jobs:
             xargs -I {} cp {} test-reports/${{ matrix.tier }}/ 2>/dev/null || true
             
           echo "Test artifacts collected for ${{ matrix.tier }} tier"
+          
+      - name: 🧹 Cleanup MQTT Broker (Integration Tier)
+        if: always() && matrix.tier == 'integration'
+        run: |
+          echo "Stopping and removing MQTT broker container..."
+          docker stop mosquitto 2>/dev/null || true
+          docker rm mosquitto 2>/dev/null || true
+          echo "✅ MQTT broker cleanup completed"
           
       - name: 📤 Upload Test Artifacts
         if: always()
