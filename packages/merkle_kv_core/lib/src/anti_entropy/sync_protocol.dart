@@ -581,7 +581,7 @@ class AntiEntropyProtocolImpl implements AntiEntropyProtocol {
         Duration(milliseconds: request.timeoutMs),
         onTimeout: () {
           _pendingSyncRequests.remove(requestId);
-          throw SyncException(SyncErrorCode.timeout, 'SYNC request timeout');
+          throw const SyncException(SyncErrorCode.timeout, 'SYNC request timeout');
         },
       );
 
@@ -638,7 +638,7 @@ class AntiEntropyProtocolImpl implements AntiEntropyProtocol {
           }
         }
         
-        throw SyncException(
+        throw const SyncException(
           SyncErrorCode.payloadTooLarge,
           'Cannot fit SYNC_KEYS payload within 512KiB limit even with single key',
         );
@@ -680,7 +680,7 @@ class AntiEntropyProtocolImpl implements AntiEntropyProtocol {
         Duration(milliseconds: request.timeoutMs),
         onTimeout: () {
           _pendingSyncKeysRequests.remove(requestId);
-          throw SyncException(SyncErrorCode.timeout, 'SYNC_KEYS request timeout');
+          throw const SyncException(SyncErrorCode.timeout, 'SYNC_KEYS request timeout');
         },
       );
 
