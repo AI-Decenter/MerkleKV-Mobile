@@ -1,0 +1,112 @@
+# Mobile E2E Test Configuration
+# This file configures the mobile end-to-end testing infrastructure
+
+# Test execution settings
+timeout: 900s  # 15 minutes for mobile tests
+retry: 2
+parallel: false  # Mobile tests should run sequentially
+
+# Platform-specific settings
+platforms:
+  android:
+    min_api_level: 21
+    target_api_level: 34
+    test_on_emulator: true
+    test_on_device: true
+    required_permissions:
+      - android.permission.INTERNET
+      - android.permission.ACCESS_NETWORK_STATE
+      - android.permission.WAKE_LOCK
+    
+  ios:
+    min_version: "10.0"
+    target_version: "17.0"
+    test_on_simulator: true
+    test_on_device: true
+    required_capabilities:
+      - com.apple.developer.networking.wifi-info
+
+# Test categories and their configurations
+test_categories:
+  lifecycle:
+    description: "Mobile app lifecycle tests"
+    timeout: 300s
+    tags: ["mobile-e2e", "lifecycle"]
+    
+  convergence:
+    description: "Anti-entropy and convergence tests"
+    timeout: 600s
+    tags: ["mobile-e2e", "convergence"]
+    
+  platform_specific:
+    description: "Android and iOS specific behavior tests"
+    timeout: 450s
+    tags: ["mobile-e2e", "platform-specific"]
+    
+  battery:
+    description: "Battery optimization and power management tests"
+    timeout: 360s
+    tags: ["mobile-e2e", "battery", "power-management"]
+
+# Test infrastructure settings
+test_infrastructure:
+  mqtt_broker:
+    host: "localhost"
+    port: 1883
+    tls_port: 8883
+    
+  mock_services:
+    enable_connectivity_simulation: true
+    enable_platform_simulation: true
+    enable_battery_simulation: true
+    
+  performance_monitoring:
+    memory_threshold_mb: 100
+    cpu_threshold_percent: 80
+    battery_drain_threshold_percent: 5
+
+# CI/CD Integration settings
+ci_integration:
+  # Firebase Test Lab configuration
+  firebase_test_lab:
+    project_id: "merkle-kv-mobile-testing"
+    android_models:
+      - "Pixel2"
+      - "NexusLowRes"
+      - "Samsung Galaxy S10"
+    ios_models:
+      - "iPhone 12"
+      - "iPhone SE (2nd generation)"
+      - "iPad Pro (11-inch)"
+      
+  # AWS Device Farm configuration
+  aws_device_farm:
+    project_arn: "arn:aws:devicefarm:us-west-2:123456789012:project:merkle-kv-mobile"
+    android_pool: "Top devices"
+    ios_pool: "Top devices"
+    
+  # Local testing configuration
+  local_testing:
+    android_emulator: "Pixel_API_34"
+    ios_simulator: "iPhone 15 Pro"
+
+# Test reporting configuration
+reporting:
+  output_format: ["junit", "json", "html"]
+  include_screenshots: true
+  include_performance_metrics: true
+  include_battery_metrics: true
+  
+  metrics_to_track:
+    - connection_establishment_time
+    - sync_completion_time
+    - memory_usage_peak
+    - battery_drain_rate
+    - network_efficiency
+    
+# Environment variables for tests
+environment:
+  LOG_LEVEL: "INFO"
+  ENABLE_DEBUG_LOGGING: "false"
+  TEST_TIMEOUT_MULTIPLIER: "1.5"  # Mobile tests may be slower
+  ENABLE_PERFORMANCE_MONITORING: "true"
