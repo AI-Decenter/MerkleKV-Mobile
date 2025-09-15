@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:async';
 
 import 'lib/src/config/merkle_kv_config.dart';

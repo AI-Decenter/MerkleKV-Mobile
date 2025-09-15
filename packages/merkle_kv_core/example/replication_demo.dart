@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:io';
 import 'package:merkle_kv_core/merkle_kv_core.dart';
 

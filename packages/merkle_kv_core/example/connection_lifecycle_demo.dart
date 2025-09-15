@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:async';
 
 import '../lib/src/config/merkle_kv_config.dart';
@@ -9,12 +10,12 @@ import '../lib/src/replication/metrics.dart';
 /// Simple console logger for demo purposes
 class DemoLogger {
   static void info(String message) {
-    // ignore: avoid_print
+
     print(message);
   }
   
   static void error(String message) {
-    // ignore: avoid_print  
+  
     print(message);
   }
 }
@@ -75,79 +76,79 @@ void main() async {
     }
 
     // Simulate app lifecycle changes
-    // ignore: avoid_print
+
     print('\n📱 Simulating app lifecycle changes...');
     
     // Simulate app going to background
-    // ignore: avoid_print
+
     print('   ⏸️  App pausing (backgrounding)...');
     await manager.handleAppStateChange(AppLifecycleState.paused);
-    // ignore: avoid_print
+
     print('   Connection status after pause: ${manager.isConnected}');
     
     // Wait a moment
     await Future.delayed(const Duration(seconds: 1));
     
     // Simulate app resuming
-    // ignore: avoid_print
+
     print('   ▶️  App resuming (foregrounding)...');
     await manager.handleAppStateChange(AppLifecycleState.resumed);
-    // ignore: avoid_print
+
     print('   Connection status after resume: ${manager.isConnected}');
 
     // Wait a moment to see connection activity
     await Future.delayed(const Duration(seconds: 2));
 
     // Demonstrate graceful disconnection
-    // ignore: avoid_print
+
     print('\n🔌 Performing graceful disconnection...');
-    // ignore: avoid_print
+
     print('   Suppressing LWT message for clean shutdown...');
     
     await manager.disconnect(suppressLWT: true);
-    // ignore: avoid_print
+
     print('✅ Disconnected successfully!');
-    // ignore: avoid_print
+
     print('   Connection status: ${manager.isConnected}');
 
   } catch (e) {
-    // ignore: avoid_print
+
     print('❌ Demo error: $e');
   } finally {
     // Clean up resources
-    // ignore: avoid_print
+
     print('\n🧹 Cleaning up resources...');
     
     await subscription.cancel();
     await manager.dispose();
     
-    // ignore: avoid_print
+
     print('✅ Cleanup completed');
   }
 
-  // ignore: avoid_print
+
   print('\n📊 Demo completed successfully!');
-  // ignore: avoid_print
+
   print('   Features demonstrated:');
-  // ignore: avoid_print
+
   print('   ✓ Connection establishment with proper handshake');
-  // ignore: avoid_print
+
   print('   ✓ Connection state monitoring and events');
-  // ignore: avoid_print
+
   print('   ✓ Platform lifecycle integration (background/foreground)');
-  // ignore: avoid_print
+
   print('   ✓ Graceful disconnection with LWT suppression');
-  // ignore: avoid_print
+
   print('   ✓ Resource cleanup and disposal');
-  // ignore: avoid_print
+
   print('   ✓ Error handling and recovery');
 }
 
 /// Example showing different configuration options
 void demonstrateConfigurationOptions() {
-  // ignore: avoid_print
+
   print('\n🔧 Connection Lifecycle Configuration Options');
-  // ignore: avoid_print
+
   print('===========================================');
 
   // Basic configuration
@@ -177,30 +178,30 @@ void demonstrateConfigurationOptions() {
     keepAliveSeconds: 120,  // Longer keep-alive for mobile networks
   );
 
-  // ignore: avoid_print
+
   print('✓ Basic configuration: ${basicConfig.mqttHost}:${basicConfig.mqttPort}');
-  // ignore: avoid_print
+
   print('✓ Secure configuration: ${secureConfig.mqttHost}:${secureConfig.mqttPort} (TLS)');
-  // ignore: avoid_print
+
   print('✓ Mobile configuration: ${mobileConfig.mqttHost}:${mobileConfig.mqttPort}');
   
-  // ignore: avoid_print
+
   print('\n🔒 Security features:');
-  // ignore: avoid_print
+
   print('   ✓ TLS encryption when credentials are provided');
-  // ignore: avoid_print
+
   print('   ✓ Certificate validation (reject bad certificates)');
-  // ignore: avoid_print
+
   print('   ✓ Credential cleanup on disconnection');
   
-  // ignore: avoid_print
+
   print('\n📱 Mobile optimizations:');
-  // ignore: avoid_print
+
   print('   ✓ Configurable background connection maintenance');
-  // ignore: avoid_print
+
   print('   ✓ Platform lifecycle event integration');
-  // ignore: avoid_print
+
   print('   ✓ Automatic reconnection on foreground resume');
-  // ignore: avoid_print
+
   print('   ✓ Proper resource cleanup for memory efficiency');
 }
