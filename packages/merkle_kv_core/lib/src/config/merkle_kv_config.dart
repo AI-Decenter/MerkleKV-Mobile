@@ -450,6 +450,12 @@ class MerkleKVConfig {
     );
   }
 
+  /// Creates a builder for constructing MerkleKVConfig with fluent API.
+  ///
+  /// Provides a convenient way to build configuration with sensible defaults
+  /// and validation at each step.
+  static MerkleKVConfigBuilder builder() => MerkleKVConfigBuilder();
+
   @override
   String toString() {
     final maskedUsername = username != null ? '***' : null;
@@ -471,5 +477,158 @@ class MerkleKVConfig {
         'persistenceEnabled: $persistenceEnabled, '
         'storagePath: $storagePath'
         '}';
+  }
+}
+
+/// Builder pattern for MerkleKVConfig with fluent API.
+///
+/// Provides a convenient way to construct MerkleKVConfig instances with
+/// sensible defaults and step-by-step validation.
+class MerkleKVConfigBuilder {
+  String? _mqttHost;
+  int? _mqttPort;
+  String? _username;
+  String? _password;
+  bool _mqttUseTls = false;
+  String? _clientId;
+  String? _nodeId;
+  String _topicPrefix = '';
+  int _keepAliveSeconds = 60;
+  int _sessionExpirySeconds = 86400;
+  int _skewMaxFutureMs = 300000;
+  int _tombstoneRetentionHours = 24;
+  int _connectionTimeoutSeconds = 20;
+  bool _persistenceEnabled = false;
+  String? _storagePath;
+
+  /// Sets the MQTT broker hostname or IP address.
+  MerkleKVConfigBuilder mqttHost(String host) {
+    _mqttHost = host;
+    return this;
+  }
+
+  /// Sets the MQTT broker port.
+  MerkleKVConfigBuilder mqttPort(int port) {
+    _mqttPort = port;
+    return this;
+  }
+
+  /// Sets MQTT credentials for authentication.
+  MerkleKVConfigBuilder credentials(String username, String password) {
+    _username = username;
+    _password = password;
+    return this;
+  }
+
+  /// Sets MQTT username for authentication.
+  MerkleKVConfigBuilder username(String username) {
+    _username = username;
+    return this;
+  }
+
+  /// Sets MQTT password for authentication.
+  MerkleKVConfigBuilder password(String password) {
+    _password = password;
+    return this;
+  }
+
+  /// Enables or disables TLS for MQTT connection.
+  MerkleKVConfigBuilder useTls([bool enabled = true]) {
+    _mqttUseTls = enabled;
+    return this;
+  }
+
+  /// Sets the unique client identifier for MQTT connection.
+  MerkleKVConfigBuilder clientId(String id) {
+    _clientId = id;
+    return this;
+  }
+
+  /// Sets the unique node identifier for replication.
+  MerkleKVConfigBuilder nodeId(String id) {
+    _nodeId = id;
+    return this;
+  }
+
+  /// Sets the topic prefix for MQTT topics.
+  MerkleKVConfigBuilder topicPrefix(String prefix) {
+    _topicPrefix = prefix;
+    return this;
+  }
+
+  /// Sets the MQTT keep-alive interval in seconds.
+  MerkleKVConfigBuilder keepAlive(int seconds) {
+    _keepAliveSeconds = seconds;
+    return this;
+  }
+
+  /// Sets the session expiry interval in seconds.
+  MerkleKVConfigBuilder sessionExpiry(int seconds) {
+    _sessionExpirySeconds = seconds;
+    return this;
+  }
+
+  /// Sets the maximum future timestamp skew in milliseconds.
+  MerkleKVConfigBuilder maxFutureSkew(int milliseconds) {
+    _skewMaxFutureMs = milliseconds;
+    return this;
+  }
+
+  /// Sets the tombstone retention period in hours.
+  MerkleKVConfigBuilder tombstoneRetention(int hours) {
+    _tombstoneRetentionHours = hours;
+    return this;
+  }
+
+  /// Sets the connection timeout in seconds.
+  MerkleKVConfigBuilder connectionTimeout(int seconds) {
+    _connectionTimeoutSeconds = seconds;
+    return this;
+  }
+
+  /// Enables or disables persistence.
+  MerkleKVConfigBuilder persistence(bool enabled, [String? storagePath]) {
+    _persistenceEnabled = enabled;
+    _storagePath = storagePath;
+    return this;
+  }
+
+  /// Sets the storage path for persistence.
+  MerkleKVConfigBuilder storagePath(String path) {
+    _storagePath = path;
+    return this;
+  }
+
+  /// Builds the MerkleKVConfig with validation.
+  ///
+  /// Throws [InvalidConfigException] if required fields are missing or invalid.
+  MerkleKVConfig build() {
+    if (_mqttHost == null) {
+      throw const InvalidConfigException('mqttHost is required', 'mqttHost');
+    }
+    if (_clientId == null) {
+      throw const InvalidConfigException('clientId is required', 'clientId');
+    }
+    if (_nodeId == null) {
+      throw const InvalidConfigException('nodeId is required', 'nodeId');
+    }
+
+    return MerkleKVConfig(
+      mqttHost: _mqttHost!,
+      mqttPort: _mqttPort,
+      username: _username,
+      password: _password,
+      mqttUseTls: _mqttUseTls,
+      clientId: _clientId!,
+      nodeId: _nodeId!,
+      topicPrefix: _topicPrefix,
+      keepAliveSeconds: _keepAliveSeconds,
+      sessionExpirySeconds: _sessionExpirySeconds,
+      skewMaxFutureMs: _skewMaxFutureMs,
+      tombstoneRetentionHours: _tombstoneRetentionHours,
+      connectionTimeoutSeconds: _connectionTimeoutSeconds,
+      persistenceEnabled: _persistenceEnabled,
+      storagePath: _storagePath,
+    );
   }
 }

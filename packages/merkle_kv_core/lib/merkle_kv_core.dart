@@ -4,10 +4,16 @@
 /// specifically for mobile edge devices using MQTT-based communication.
 library merkle_kv_mobile;
 
+// Public API surface
+export 'merkle_kv.dart';
+
 // Configuration
 export 'src/config/merkle_kv_config.dart';
 export 'src/config/invalid_config_exception.dart';
 export 'src/config/default_config.dart';
+
+// Exceptions
+export 'src/exceptions/merkle_kv_exception.dart';
 
 // MQTT Client
 export 'src/mqtt/connection_state.dart';
@@ -44,5 +50,5 @@ export 'src/anti_entropy/sync_protocol.dart';
 // Merkle Tree
 export 'src/merkle/merkle_tree.dart';
 
-// Core exports will be added in future phases
-// export 'src/merkle_kv_mobile.dart';
+// Models
+export 'src/models/key_value_result.dart';
