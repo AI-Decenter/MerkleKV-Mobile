@@ -423,10 +423,13 @@ void main() {
 
     group('App lifecycle handling', () {
       test('app backgrounding with connection maintenance', () async {
+        final backgroundMockClient = MockMqttClient();
+        final backgroundMetrics = InMemoryReplicationMetrics();
+        
         final backgroundManager = DefaultConnectionLifecycleManager(
           config: config,
-          mqttClient: mockClient,
-          metrics: metrics,
+          mqttClient: backgroundMockClient,
+          metrics: backgroundMetrics,
           maintainConnectionInBackground: true,
         );
         
@@ -439,13 +442,17 @@ void main() {
         expect(backgroundManager.isConnected, isTrue);
         
         await backgroundManager.dispose();
+        backgroundMockClient.dispose();
       });
 
       test('app backgrounding without connection maintenance', () async {
+        final backgroundMockClient = MockMqttClient();
+        final backgroundMetrics = InMemoryReplicationMetrics();
+        
         final backgroundManager = DefaultConnectionLifecycleManager(
           config: config,
-          mqttClient: mockClient,
-          metrics: metrics,
+          mqttClient: backgroundMockClient,
+          metrics: backgroundMetrics,
           maintainConnectionInBackground: false,
         );
         
@@ -458,13 +465,17 @@ void main() {
         expect(backgroundManager.isConnected, isFalse);
         
         await backgroundManager.dispose();
+        backgroundMockClient.dispose();
       });
 
       test('app resuming reconnects if needed', () async {
+        final backgroundMockClient = MockMqttClient();
+        final backgroundMetrics = InMemoryReplicationMetrics();
+        
         final backgroundManager = DefaultConnectionLifecycleManager(
           config: config,
-          mqttClient: mockClient,
-          metrics: metrics,
+          mqttClient: backgroundMockClient,
+          metrics: backgroundMetrics,
           maintainConnectionInBackground: false,
         );
         
@@ -478,6 +489,7 @@ void main() {
         expect(backgroundManager.isConnected, isTrue);
         
         await backgroundManager.dispose();
+        backgroundMockClient.dispose();
       });
 
       test('inactive state is handled gracefully', () async {
@@ -654,13 +666,16 @@ void main() {
           keepAliveSeconds: 1, // Very short for testing
         );
         
+        final shortMockClient = MockMqttClient();
+        final shortMetrics = InMemoryReplicationMetrics();
+        
         final shortManager = DefaultConnectionLifecycleManager(
           config: shortConfig,
-          mqttClient: mockClient,
-          metrics: metrics,
+          mqttClient: shortMockClient,
+          metrics: shortMetrics,
         );
         
-        mockClient.connectDelay = TestTimings.shortTimeout; // Longer than timeout
+        shortMockClient.connectDelay = TestTimings.shortTimeout; // Longer than timeout
         
         await expectLater(
           shortManager.connect(),
@@ -668,6 +683,7 @@ void main() {
         );
         
         await shortManager.dispose();
+        shortMockClient.dispose();
       });
 
       test('respects TLS configuration', () async {
@@ -680,16 +696,21 @@ void main() {
           password: 'testpass',
         );
         
+        // Use a separate mock client instance for this test to avoid conflicts
+        final tlsMockClient = MockMqttClient();
+        final tlsMetrics = InMemoryReplicationMetrics();
+        
         final tlsManager = DefaultConnectionLifecycleManager(
           config: tlsConfig,
-          mqttClient: mockClient,
-          metrics: metrics,
+          mqttClient: tlsMockClient,
+          metrics: tlsMetrics,
         );
         
         await tlsManager.connect();
         expect(tlsManager.isConnected, isTrue);
         
         await tlsManager.dispose();
+        tlsMockClient.dispose();
       });
     });
   });

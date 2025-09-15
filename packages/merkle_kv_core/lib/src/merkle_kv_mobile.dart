@@ -81,6 +81,9 @@ class MerkleKV {
       throw const ValidationException('Client is already initialized');
     }
 
+    // Mark as initialized immediately to prevent multiple concurrent connect attempts
+    _isInitialized = true;
+
     try {
       _updateConnectionState(ConnectionState.connecting);
 
@@ -104,10 +107,12 @@ class MerkleKV {
       // Connect to MQTT broker
       await _mqttClient.connect();
 
-      _isInitialized = true;
       _isConnected = true;
       _updateConnectionState(ConnectionState.connected);
     } catch (e) {
+      // Keep _isInitialized as true to prevent retry attempts
+      // Client must be disposed and recreated for a new connection attempt
+      _isConnected = false;
       _updateConnectionState(ConnectionState.disconnected);
       if (e is MerkleKVException) {
         rethrow;
