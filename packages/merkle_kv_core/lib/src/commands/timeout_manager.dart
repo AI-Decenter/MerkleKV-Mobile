@@ -13,16 +13,16 @@ enum OperationType {
 }
 
 /// Exception thrown when an operation times out
-class TimeoutException implements Exception {
+class OperationTimeoutException implements Exception {
   final String message;
   final String requestId;
   final Duration elapsed;
 
-  TimeoutException(this.requestId, this.elapsed, {String? customMessage})
+  OperationTimeoutException(this.requestId, this.elapsed, {String? customMessage})
       : message = customMessage ?? 'Operation $requestId timed out after ${elapsed.inMilliseconds}ms';
 
   @override
-  String toString() => 'TimeoutException: $message';
+  String toString() => 'OperationTimeoutException: $message';
 }
 
 /// Manages operation timeouts using monotonic timers
@@ -103,7 +103,7 @@ class TimeoutManager {
     if (isTimedOut(requestId, timeout)) {
       final elapsed = getElapsedTime(requestId);
       stopOperation(requestId);
-      throw TimeoutException(requestId, elapsed);
+      throw OperationTimeoutException(requestId, elapsed);
     }
   }
   

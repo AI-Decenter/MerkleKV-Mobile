@@ -21,15 +21,15 @@ class CborValidationException implements Exception {
 }
 
 /// Exception thrown when payload exceeds size limits
-class PayloadTooLargeException implements Exception {
-  const PayloadTooLargeException(this.message,
+class CborPayloadTooLargeException implements Exception {
+  const CborPayloadTooLargeException(this.message,
       [this.errorCode = _payloadTooLargeErrorCode]);
 
   final String message;
   final int errorCode;
 
   @override
-  String toString() => 'PayloadTooLargeException: $message (code: $errorCode)';
+  String toString() => 'CborPayloadTooLargeException: $message (code: $errorCode)';
 }
 
 /// Replication event model as per Locked Spec §3.3
@@ -193,7 +193,7 @@ class CborSerializer {
 
   /// Encode a replication event to CBOR bytes with deterministic ordering
   ///
-  /// Throws [PayloadTooLargeException] if encoded size exceeds 300 KiB
+  /// Throws [CborPayloadTooLargeException] if encoded size exceeds 300 KiB
   static Uint8List encode(ReplicationEvent event) {
     // Create deterministic map with stable key order
     final map = _createDeterministicMap(event);
@@ -203,7 +203,7 @@ class CborSerializer {
 
     // Check size limit and return as Uint8List
     if (encoded.length > _maxCborPayloadSize) {
-      throw PayloadTooLargeException(
+      throw CborPayloadTooLargeException(
         'CBOR payload size ${encoded.length} exceeds limit of $_maxCborPayloadSize bytes',
       );
     }
@@ -214,11 +214,11 @@ class CborSerializer {
   /// Decode CBOR bytes to a replication event
   ///
   /// Throws [CborValidationException] for invalid CBOR or schema violations
-  /// Throws [PayloadTooLargeException] if payload exceeds size limits
+  /// Throws [CborPayloadTooLargeException] if payload exceeds size limits
   static ReplicationEvent decode(Uint8List bytes) {
     // Check size limit
     if (bytes.length > _maxCborPayloadSize) {
-      throw PayloadTooLargeException(
+      throw CborPayloadTooLargeException(
         'CBOR payload size ${bytes.length} exceeds limit of $_maxCborPayloadSize bytes',
       );
     }
@@ -245,7 +245,7 @@ class CborSerializer {
     } on FormatException catch (e) {
       throw CborValidationException('Invalid CBOR data: ${e.toString()}');
     } catch (e) {
-      if (e is CborValidationException || e is PayloadTooLargeException) {
+      if (e is CborValidationException || e is CborPayloadTooLargeException) {
         rethrow;
       }
       throw CborValidationException('Failed to decode CBOR: $e');
