@@ -287,7 +287,7 @@ void main() {
 
         expect(
           () => CborSerializer.encode(event),
-          throwsA(isA<PayloadTooLargeException>()),
+          throwsA(isA<CborPayloadTooLargeException>()),
         );
       });
 
@@ -296,7 +296,7 @@ void main() {
 
         expect(
           () => CborSerializer.decode(oversizedBytes),
-          throwsA(isA<PayloadTooLargeException>()),
+          throwsA(isA<CborPayloadTooLargeException>()),
         );
       });
 

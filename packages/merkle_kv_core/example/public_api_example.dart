@@ -3,7 +3,7 @@ import 'package:merkle_kv_core/merkle_kv.dart';
 /// Example demonstrating the MerkleKV public API usage
 Future<void> main() async {
   // 1. Configure using builder pattern
-  final client = MerkleKV.builder()
+  final config = MerkleKV.builder()
       .mqttHost('mqtt.example.com')
       .mqttPort(8883)
       .useTls()
@@ -15,39 +15,42 @@ Future<void> main() async {
       .persistence(true, '/data/merkle_kv')
       .build();
 
+  // 2. Create client instance
+  final client = MerkleKV(config);
+
   print('MerkleKV Client Version: ${client.version}');
 
   try {
-    // 2. Connect to broker
+    // 3. Connect to broker
     print('Connecting to MQTT broker...');
     await client.connect();
     print('Connected successfully!');
 
-    // 3. Monitor connection state
+    // 4. Monitor connection state
     client.connectionState.listen((state) {
       print('Connection state changed: $state');
     });
 
-    // 4. Basic operations
+    // 5. Basic operations
     await client.set('user:123:name', 'Alice Smith');
     print('Set user name');
 
     final userName = await client.get('user:123:name');
     print('Retrieved user name: $userName');
 
-    // 5. Numeric operations
+    // 6. Numeric operations
     await client.increment('global:counter');
     final count = await client.increment('global:counter', 5);
     print('Global counter: $count');
 
-    // 6. String operations
+    // 7. String operations
     await client.set('log:entry', 'Starting application');
     await client.append('log:entry', ' - User logged in');
     await client.prepend('log:entry', '[INFO] ');
     final logEntry = await client.get('log:entry');
     print('Log entry: $logEntry');
 
-    // 7. Bulk operations
+    // 8. Bulk operations
     final userIds = ['user:123', 'user:456', 'user:789'];
     final users = await client.multiGet([
       'user:123:name',
@@ -63,13 +66,13 @@ Future<void> main() async {
     });
     print('Created new user with multiple fields');
 
-    // 8. Idempotent operations with custom request IDs
+    // 9. Idempotent operations with custom request IDs
     const requestId = 'critical-operation-123';
     await client.set('important:data', 'critical value', requestId);
     // Retry with same ID - will be idempotent
     await client.set('important:data', 'critical value', requestId);
 
-    // 9. Delete operations (always succeed)
+    // 10. Delete operations (always succeed)
     await client.delete('temp:data');
     await client.delete('non-existent:key'); // Still succeeds
     print('Cleanup completed');
@@ -87,7 +90,7 @@ Future<void> main() async {
   } on MerkleKVException catch (e) {
     print('MerkleKV error: ${e.message} (code: ${e.errorCode})');
   } finally {
-    // 10. Clean shutdown
+    // 11. Clean shutdown
     print('Disconnecting...');
     await client.disconnect();
     await client.dispose();
@@ -126,11 +129,13 @@ Future<void> advancedConfigExample() async {
 
 /// Example error handling patterns
 Future<void> errorHandlingExample() async {
-  final client = MerkleKV.builder()
+  final config = MerkleKV.builder()
       .mqttHost('mqtt.test.com')
       .clientId('test-client')
       .nodeId('test-node')
       .build();
+      
+  final client = MerkleKV(config);
 
   try {
     // This will fail validation

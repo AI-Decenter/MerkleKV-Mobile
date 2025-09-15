@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import '../../lib/merkle_kv.dart';
+import '../../lib/src/commands/response.dart';
 
 /// Integration test demonstrating the public API usage.
 /// 
@@ -184,7 +185,7 @@ void main() {
 
     test('comprehensive example usage pattern', () async {
       // This demonstrates how a developer would use the API
-      final client = MerkleKV.builder()
+      final config = MerkleKV.builder()
           .mqttHost('mqtt.mycompany.com')
           .mqttPort(8883)
           .useTls()
@@ -195,6 +196,8 @@ void main() {
           .keepAlive(60)
           .persistence(true)
           .build();
+
+      final client = MerkleKV(config);
 
       expect(client, isA<MerkleKV>());
 

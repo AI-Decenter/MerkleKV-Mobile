@@ -94,7 +94,12 @@ class MerkleKV {
       _mqttClient = MqttClientImpl(_config);
 
       // Initialize command correlator
-      _commandCorrelator = CommandCorrelator(_mqttClient);
+      _commandCorrelator = CommandCorrelator(
+        publishCommand: (jsonPayload) => _mqttClient.publish(
+          '${_config.topicPrefix}/${_config.clientId}/cmd',
+          jsonPayload,
+        ),
+      );
 
       // Connect to MQTT broker
       await _mqttClient.connect();

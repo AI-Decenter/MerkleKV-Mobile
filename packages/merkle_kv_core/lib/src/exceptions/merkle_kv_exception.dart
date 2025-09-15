@@ -38,9 +38,9 @@ abstract class MerkleKVException implements Exception {
       case ErrorCode.payloadTooLarge:
         return PayloadException(message);
       case ErrorCode.rangeOverflow:
-        return ValidationException(message);
+        return ValidationException.withCode(code, message);
       case ErrorCode.invalidType:
-        return ValidationException(message);
+        return ValidationException.withCode(code, message);
       case ErrorCode.internalError:
       default:
         return InternalException(message);
@@ -58,6 +58,10 @@ class ConnectionException extends MerkleKVException {
 class ValidationException extends MerkleKVException {
   const ValidationException(String message, [Object? cause])
       : super(ErrorCode.invalidRequest, message, cause);
+  
+  /// Creates a ValidationException with a custom error code.
+  const ValidationException.withCode(int errorCode, String message, [Object? cause])
+      : super(errorCode, message, cause);
 }
 
 /// Exception thrown when operations timeout.

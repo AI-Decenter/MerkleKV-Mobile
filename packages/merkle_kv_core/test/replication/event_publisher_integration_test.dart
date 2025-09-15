@@ -176,10 +176,10 @@ void main() {
         value: largeValue,
       );
 
-      // Should throw PayloadTooLargeException when trying to encode
+      // Should throw CborPayloadTooLargeException when trying to encode
       expect(
         () => CborSerializer.encode(event),
-        throwsA(isA<PayloadTooLargeException>()),
+        throwsA(isA<CborPayloadTooLargeException>()),
       );
     });
 
