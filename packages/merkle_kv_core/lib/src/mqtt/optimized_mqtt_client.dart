@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../config/merkle_kv_config.dart';
 import '../replication/metrics.dart';
 import '../utils/payload_optimizer.dart';
+import 'connection_state.dart';
 import 'mqtt_client_interface.dart';
 import 'mqtt_client_impl.dart';
 
@@ -38,10 +39,10 @@ class OptimizedMqttClient implements MqttClientInterface {
   Future<void> connect() => _client.connect();
 
   @override
-  Future<void> disconnect() => _client.disconnect();
+  Future<void> disconnect({bool suppressLWT = true}) => _client.disconnect(suppressLWT: suppressLWT);
 
   @override
-  Future<void> publish(String topic, String payload) async {
+  Future<void> publish(String topic, String payload, {bool forceQoS1 = true, bool forceRetainFalse = true}) async {
     try {
       // Try to optimize JSON payload if it's valid JSON
       String optimizedPayload;
@@ -69,7 +70,7 @@ class OptimizedMqttClient implements MqttClientInterface {
       }
       
       // Publish optimized payload
-      await _client.publish(topic, optimizedPayload);
+      await _client.publish(topic, optimizedPayload, forceQoS1: forceQoS1, forceRetainFalse: forceRetainFalse);
     } catch (e) {
       // Re-throw any exceptions
       rethrow;
@@ -79,10 +80,10 @@ class OptimizedMqttClient implements MqttClientInterface {
   @override
   Future<void> subscribe(
     String topic,
-    void Function(String, String) callback,
+    void Function(String, String) handler,
   ) {
     // Pass-through subscriptions (no optimization needed for incoming messages)
-    return _client.subscribe(topic, callback);
+    return _client.subscribe(topic, handler);
   }
 
   @override
@@ -152,16 +153,7 @@ extension OptimizedMqttClientFactory on MqttClientInterface {
     ReplicationMetrics? metrics,
   }) {
     // Create the base MQTT client
-    final MqttClientInterface baseClient = MqttClientImpl(
-      host: config.mqttHost,
-      port: config.mqttPort,
-      clientId: config.clientId,
-      username: config.username,
-      password: config.password,
-      useTls: config.mqttUseTls,
-      keepAliveSeconds: config.keepAliveSeconds,
-      sessionExpirySeconds: config.sessionExpirySeconds,
-    );
+    final MqttClientInterface baseClient = MqttClientImpl(config);
     
     // Wrap with optimized client
     return OptimizedMqttClient(baseClient, metrics: metrics);

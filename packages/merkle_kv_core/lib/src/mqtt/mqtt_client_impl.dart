@@ -108,17 +108,51 @@ class MqttClientImpl implements MqttClientInterface {
     }
   }
 
-  /// Attempt connection with current settings.
+  /// Attempt connection with current settings and timeout.
   Future<void> _attemptConnection() async {
     try {
       var status;
 
+      // Create a timeout completer for configurable connection timeout
+      final connectionCompleter = Completer<MqttClientConnectionStatus?>();
+      Timer? timeoutTimer;
+
+      // Set up timeout from configuration
+      timeoutTimer = Timer(Duration(seconds: _config.connectionTimeoutSeconds), () {
+        if (!connectionCompleter.isCompleted) {
+          connectionCompleter.completeError(Exception('Connection timeout after ${_config.connectionTimeoutSeconds} seconds'));
+        }
+      });
+
       // Handle authentication
       if (_config.username != null && _config.password != null) {
-        status = await _client.connect(_config.username!, _config.password!);
+        _client.connect(_config.username!, _config.password!).then((status) {
+          timeoutTimer?.cancel();
+          if (!connectionCompleter.isCompleted) {
+            connectionCompleter.complete(status);
+          }
+        }).catchError((error) {
+          timeoutTimer?.cancel();
+          if (!connectionCompleter.isCompleted) {
+            connectionCompleter.completeError(error);
+          }
+        });
       } else {
-        status = await _client.connect();
+        _client.connect().then((status) {
+          timeoutTimer?.cancel();
+          if (!connectionCompleter.isCompleted) {
+            connectionCompleter.complete(status);
+          }
+        }).catchError((error) {
+          timeoutTimer?.cancel();
+          if (!connectionCompleter.isCompleted) {
+            connectionCompleter.completeError(error);
+          }
+        });
       }
+
+      // Wait for connection or timeout
+      status = await connectionCompleter.future;
 
       if (status?.state != MqttConnectionState.connected) {
         throw Exception('Connection failed: ${status?.state}');
@@ -129,6 +163,9 @@ class MqttClientImpl implements MqttClientInterface {
       if (e.toString().contains('authentication') ||
           e.toString().contains('unauthorized')) {
         throw Exception('Authentication failed');
+      }
+      if (e.toString().contains('timeout')) {
+        throw Exception('Connection timeout after 20 seconds');
       }
       throw Exception('MQTT error: ${e.toString()}');
     }

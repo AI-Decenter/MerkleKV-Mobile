@@ -61,6 +61,11 @@ class MerkleKVConfig {
   /// Default: 24 hours.
   final int tombstoneRetentionHours;
 
+  /// MQTT connection timeout in seconds.
+  ///
+  /// Default: 20 seconds (increased for CI environments).
+  final int connectionTimeoutSeconds;
+
   /// Whether persistence to disk is enabled.
   final bool persistenceEnabled;
 
@@ -86,6 +91,7 @@ class MerkleKVConfig {
     required this.sessionExpirySeconds,
     required this.skewMaxFutureMs,
     required this.tombstoneRetentionHours,
+    required this.connectionTimeoutSeconds,
     required this.persistenceEnabled,
     required this.storagePath,
   });
@@ -107,6 +113,7 @@ class MerkleKVConfig {
     int sessionExpirySeconds = 86400,
     int skewMaxFutureMs = 300000,
     int tombstoneRetentionHours = 24,
+    int connectionTimeoutSeconds = 20,
     bool persistenceEnabled = false,
     String? storagePath,
   }) {
@@ -123,6 +130,7 @@ class MerkleKVConfig {
       sessionExpirySeconds: sessionExpirySeconds,
       skewMaxFutureMs: skewMaxFutureMs,
       tombstoneRetentionHours: tombstoneRetentionHours,
+      connectionTimeoutSeconds: connectionTimeoutSeconds,
       persistenceEnabled: persistenceEnabled,
       storagePath: storagePath,
     );
@@ -162,6 +170,7 @@ class MerkleKVConfig {
     String topicPrefix = '',
     int keepAliveSeconds = 60,
     int sessionExpirySeconds = 86400,
+    int connectionTimeoutSeconds = 20,
     int skewMaxFutureMs = 300000,
     int tombstoneRetentionHours = 24,
     bool persistenceEnabled = false,
@@ -186,6 +195,7 @@ class MerkleKVConfig {
       topicPrefix: topicPrefix,
       keepAliveSeconds: keepAliveSeconds,
       sessionExpirySeconds: sessionExpirySeconds,
+      connectionTimeoutSeconds: connectionTimeoutSeconds,
       skewMaxFutureMs: skewMaxFutureMs,
       tombstoneRetentionHours: tombstoneRetentionHours,
       persistenceEnabled: persistenceEnabled,
@@ -207,6 +217,7 @@ class MerkleKVConfig {
     required int sessionExpirySeconds,
     required int skewMaxFutureMs,
     required int tombstoneRetentionHours,
+    required int connectionTimeoutSeconds,
     required bool persistenceEnabled,
     String? storagePath,
   }) {
@@ -264,6 +275,13 @@ class MerkleKVConfig {
       );
     }
 
+    if (connectionTimeoutSeconds <= 0) {
+      throw const InvalidConfigException(
+        'Connection timeout seconds must be positive',
+        'connectionTimeoutSeconds',
+      );
+    }
+
     if (skewMaxFutureMs < 0) {
       throw const InvalidConfigException(
         'Skew max future milliseconds must be non-negative',
@@ -317,6 +335,7 @@ class MerkleKVConfig {
       topicPrefix: normalizedPrefix,
       keepAliveSeconds: keepAliveSeconds,
       sessionExpirySeconds: sessionExpirySeconds,
+      connectionTimeoutSeconds: connectionTimeoutSeconds,
       skewMaxFutureMs: skewMaxFutureMs,
       tombstoneRetentionHours: tombstoneRetentionHours,
       persistenceEnabled: persistenceEnabled,
@@ -349,6 +368,7 @@ class MerkleKVConfig {
     String? topicPrefix,
     int? keepAliveSeconds,
     int? sessionExpirySeconds,
+    int? connectionTimeoutSeconds,
     int? skewMaxFutureMs,
     int? tombstoneRetentionHours,
     bool? persistenceEnabled,
@@ -373,6 +393,7 @@ class MerkleKVConfig {
       topicPrefix: topicPrefix ?? this.topicPrefix,
       keepAliveSeconds: keepAliveSeconds ?? this.keepAliveSeconds,
       sessionExpirySeconds: sessionExpirySeconds ?? this.sessionExpirySeconds,
+      connectionTimeoutSeconds: connectionTimeoutSeconds ?? this.connectionTimeoutSeconds,
       skewMaxFutureMs: skewMaxFutureMs ?? this.skewMaxFutureMs,
       tombstoneRetentionHours:
           tombstoneRetentionHours ?? this.tombstoneRetentionHours,

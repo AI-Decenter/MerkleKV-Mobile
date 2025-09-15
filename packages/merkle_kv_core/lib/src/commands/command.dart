@@ -1,9 +1,6 @@
 import 'dart:convert';
 
 import '../utils/numeric_operations.dart';
-import '../utils/string_operations.dart';
-import '../utils/bulk_operations.dart';
-import '../models/key_value_result.dart';
 
 /// Represents a command to be sent to MerkleKV.
 ///
@@ -65,16 +62,44 @@ class Command {
       throw const FormatException('Missing or invalid "op" field');
     }
 
-    return Command(
-      id: id,
-      op: op,
-      key: json['key'] as String?,
-      keys: (json['keys'] as List?)?.cast<String>(),
-      value: json['value'],
-      keyValues: (json['keyValues'] as Map?)?.cast<String, dynamic>(),
-      amount: json['amount'] as int?,
-      params: (json['params'] as Map?)?.cast<String, dynamic>(),
-    );
+    // Validate key field type
+    final key = json['key'];
+    if (key != null && key is! String) {
+      throw const FormatException('Invalid "key" field - must be string');
+    }
+
+    // Validate keys field type
+    final keys = json['keys'];
+    if (keys != null && keys is! List) {
+      throw const FormatException('Invalid "keys" field - must be array');
+    }
+
+    // Validate keyValues field type
+    final keyValues = json['keyValues'];
+    if (keyValues != null && keyValues is! Map) {
+      throw const FormatException('Invalid "keyValues" field - must be object');
+    }
+
+    // Validate amount field type
+    final amount = json['amount'];
+    if (amount != null && amount is! int) {
+      throw const FormatException('Invalid "amount" field - must be integer');
+    }
+
+    try {
+      return Command(
+        id: id,
+        op: op,
+        key: key as String?,
+        keys: keys?.cast<String>(),
+        value: json['value'],
+        keyValues: keyValues?.cast<String, dynamic>(),
+        amount: amount as int?,
+        params: (json['params'] as Map?)?.cast<String, dynamic>(),
+      );
+    } catch (e) {
+      throw FormatException('Invalid field types: $e');
+    }
   }
 
   /// Converts Command to JSON object for serialization.

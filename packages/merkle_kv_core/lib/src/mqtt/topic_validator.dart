@@ -27,8 +27,8 @@ class TopicValidator {
   /// Maximum client ID length in UTF-8 bytes.
   static const int maxClientIdLength = 128;
   
-  /// Allowed characters pattern: [A-Za-z0-9_/-]
-  static final RegExp _allowedCharsPattern = RegExp(r'^[A-Za-z0-9_/-]+$');
+  /// Allowed characters pattern: [A-Za-z0-9_/-] but no consecutive slashes
+  static final RegExp _allowedCharsPattern = RegExp(r'^[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$');
   
   /// MQTT wildcard characters that must be rejected.
   static const List<String> _mqttWildcards = ['+', '#'];

@@ -108,7 +108,8 @@ class TimeoutManager {
   }
   
   /// Cleans up any stale operations (useful for periodic maintenance)
-  void cleanupStaleOperations() {
+  /// Returns the number of operations cleaned up
+  int cleanupStaleOperations() {
     final staleOperations = <String>[];
     
     _activeOperations.forEach((requestId, stopwatch) {
@@ -123,5 +124,7 @@ class TimeoutManager {
     for (final requestId in staleOperations) {
       _activeOperations.remove(requestId)?.stop();
     }
+    
+    return staleOperations.length;
   }
 }

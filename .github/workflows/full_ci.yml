@@ -263,6 +263,14 @@ jobs:
         ports:
           - 1883:1883
           - 9001:9001
+        # Note: Using default config with anonymous access enabled for testing
+        # Custom test config will be applied via environment variables if needed
+        options: >-
+          --health-cmd "mosquitto_pub -h localhost -p 1883 -t health/check -m test --qos 0"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
         
     steps:
       - name: 📚 Checkout Repository
@@ -298,10 +306,117 @@ jobs:
           melos bootstrap --verbose
           
       # -----------------------------------------------------------------------
-      # MQTT Broker Validation for Integration Tests
+      # MQTT Broker Health Check for Integration Tests
       # -----------------------------------------------------------------------
-      # Ensures service container is operational before proceeding with
-      # integration tests that depend on MQTT communication functionality
+      # Ensures service container is operational and validates MQTT functionality
+      # before proceeding with tests that depend on MQTT communication
+      #
+      - name: 🔌 MQTT Broker Health Check (Integration Tier)
+        if: matrix.tier == 'integration'
+        run: |
+          echo "Running comprehensive MQTT broker health check..."
+          
+          # Install mosquitto clients if not available
+          sudo apt-get update && sudo apt-get install -y mosquitto-clients netcat-openbsd
+          
+          # Check if broker is running and accepting anonymous connections
+          echo "Checking initial broker status..."
+          docker ps | grep mosquitto || echo "No mosquitto container found via grep"
+          
+          # If the default broker doesn't allow anonymous connections, restart with proper config
+          echo "Testing broker connectivity..."
+          if ! timeout 10s mosquitto_pub -h localhost -p 1883 -t "test/connectivity" -m "test" --qos 0 2>/dev/null; then
+            echo "Default broker config doesn't allow anonymous connections, creating test config..."
+            
+            # Create minimal anonymous config
+            mkdir -p /tmp/mosquitto-config
+            cat > /tmp/mosquitto-config/mosquitto.conf << 'EOF'
+          # Minimal Mosquitto configuration for CI testing
+          listener 1883
+          allow_anonymous true
+          log_dest stdout
+          log_type error
+          log_type warning
+          log_type notice
+          log_type information
+          connection_messages true
+          EOF
+            
+            # Stop existing broker if running
+            docker stop $(docker ps -q --filter "ancestor=eclipse-mosquitto:1.6") 2>/dev/null || true
+            docker rm $(docker ps -aq --filter "ancestor=eclipse-mosquitto:1.6") 2>/dev/null || true
+            
+            # Start new broker with anonymous config
+            echo "Starting MQTT broker with anonymous access..."
+            docker run -d --name ci-mosquitto \
+              -p 1883:1883 \
+              -v /tmp/mosquitto-config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro \
+              eclipse-mosquitto:1.6
+              
+            echo "Waiting for new broker to initialize..."
+            sleep 5
+          fi
+          
+          # Wait for Mosquitto broker to be fully ready (enhanced wait)
+          echo "Waiting for Mosquitto broker to be ready for connections..."
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Testing broker connectivity..."
+            
+            # Test TCP connection first
+            if nc -z localhost 1883; then
+              echo "✅ TCP connection successful"
+              
+              # Test MQTT connection with extended timeout and better validation
+              if timeout 15s mosquitto_pub -h localhost -p 1883 -t "health/check" -m "test" --qos 0 2>/dev/null; then
+                echo "✅ MQTT publish successful"
+                
+                # Also test subscribe to ensure full broker functionality
+                if timeout 10s bash -c 'mosquitto_sub -h localhost -p 1883 -t "health/check" -C 1 >/dev/null 2>&1 &
+                SUB_PID=$!
+                sleep 1
+                mosquitto_pub -h localhost -p 1883 -t "health/check" -m "ready" --qos 0
+                wait $SUB_PID'; then
+                  echo "✅ MQTT broker is ready and accepting connections!"
+                  break
+                else
+                  echo "⏳ MQTT publish works but subscribe/publish cycle failed..."
+                fi
+              else
+                echo "⏳ MQTT broker not ready for messaging yet..."
+              fi
+            else
+              echo "⏳ TCP connection not available yet..."
+            fi
+            
+            if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+              echo "❌ Broker failed to become ready after $MAX_ATTEMPTS attempts (2 minutes)"
+              echo "Checking broker logs..."
+              docker logs $(docker ps -q --filter "ancestor=eclipse-mosquitto:1.6") 2>/dev/null || echo "No broker logs available"
+              exit 1
+            fi
+            
+            sleep 2
+          done
+          
+          # Make health check script executable
+          chmod +x ./scripts/mqtt_health_check.sh
+          
+          # Run comprehensive health check with environment variables
+          MQTT_BROKER_HOST=localhost \
+          MQTT_BROKER_PORT=1883 \
+          MQTT_HEALTH_TIMEOUT=30 \
+          ./scripts/mqtt_health_check.sh
+          
+          echo "✅ MQTT broker health check completed successfully"
+          
+      # -----------------------------------------------------------------------
+      # MQTT Broker Validation for Integration Tests (Legacy)
+      # -----------------------------------------------------------------------
+      # Legacy validation kept for compatibility and additional verification
       #
       - name: 🔌 Validate MQTT Broker (Integration Tier)
         if: matrix.tier == 'integration'

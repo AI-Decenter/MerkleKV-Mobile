@@ -202,15 +202,19 @@ void main() {
       test('generates correct version vector', () async {
         final beforeTime = DateTime.now().millisecondsSinceEpoch;
 
-        await processor.set('key1', 'value1', 'test-req');
-        await processor.set('key2', 'value2', 'test-req');
+        await processor.set('key1', 'value1', 'test-req-1');
+        await processor.set('key2', 'value2', 'test-req-2');
 
-        final entry1 = storage.getEntry('key1')!;
-        final entry2 = storage.getEntry('key2')!;
+        final entry1 = storage.getEntry('key1');
+        final entry2 = storage.getEntry('key2');
+
+        // Verify entries were stored
+        expect(entry1, isNotNull, reason: 'key1 should be stored');
+        expect(entry2, isNotNull, reason: 'key2 should be stored');
 
         // Check timestamps
-        expect(entry1.timestampMs, greaterThanOrEqualTo(beforeTime));
-        expect(entry2.timestampMs, greaterThanOrEqualTo(entry1.timestampMs));
+        expect(entry1!.timestampMs, greaterThanOrEqualTo(beforeTime));
+        expect(entry2!.timestampMs, greaterThanOrEqualTo(entry1.timestampMs));
 
         // Check node IDs
         expect(entry1.nodeId, equals('test-node'));
@@ -248,8 +252,9 @@ void main() {
 
         expect(response.status, equals(ResponseStatus.ok));
 
-        final stored = storage.getEntry('key')!;
-        expect(stored.value, equals(maxValue));
+        final stored = storage.getEntry('key');
+        expect(stored, isNotNull, reason: 'Entry should be stored');
+        expect(stored!.value, equals(maxValue));
       });
 
       test('handles UTF-8 characters correctly', () async {
@@ -259,24 +264,26 @@ void main() {
 
         expect(response.status, equals(ResponseStatus.ok));
 
-        final stored = storage.getEntry('unicode-key')!;
-        expect(stored.value, equals(unicodeValue));
+        final stored = storage.getEntry('unicode-key');
+        expect(stored, isNotNull, reason: 'Unicode entry should be stored');
+        expect(stored!.value, equals(unicodeValue));
       });
     });
 
     group('DELETE operation', () {
       test('creates tombstone for existing key', () async {
         // Setup: Store an entry first
-        await processor.set('test-key', 'test-value', 'test-req');
+        await processor.set('test-key', 'test-value', 'test-req-1');
 
-        final response = await processor.delete('test-key', 'test-req');
+        final response = await processor.delete('test-key', 'test-req-2');
 
         expect(response.status, equals(ResponseStatus.ok));
         expect(response.errorCode, isNull);
 
         // Verify tombstone was created
-        final tombstone = storage.getEntry('test-key')!;
-        expect(tombstone.key, equals('test-key'));
+        final tombstone = storage.getEntry('test-key');
+        expect(tombstone, isNotNull, reason: 'Tombstone should be created');
+        expect(tombstone!.key, equals('test-key'));
         expect(tombstone.value, isNull);
         expect(tombstone.isTombstone, isTrue);
         expect(tombstone.nodeId, equals('test-node'));
@@ -290,8 +297,9 @@ void main() {
         expect(response.errorCode, isNull);
 
         // Verify tombstone was created even for missing key
-        final tombstone = storage.getEntry('missing-key')!;
-        expect(tombstone.isTombstone, isTrue);
+        final tombstone = storage.getEntry('missing-key');
+        expect(tombstone, isNotNull, reason: 'Tombstone should be created for missing key');
+        expect(tombstone!.isTombstone, isTrue);
       });
 
       test('returns PAYLOAD_TOO_LARGE for oversized key', () async {
@@ -304,12 +312,13 @@ void main() {
       });
 
       test('generates correct sequence number', () async {
-        await processor.set('key1', 'value1', 'test-req'); // seq 1
-        await processor.set('key2', 'value2', 'test-req'); // seq 2
-        await processor.delete('key1', 'test-req'); // seq 3
+        await processor.set('key1', 'value1', 'test-req-1'); // seq 1
+        await processor.set('key2', 'value2', 'test-req-2'); // seq 2
+        await processor.delete('key1', 'test-req-3'); // seq 3
 
-        final tombstone = storage.getEntry('key1')!;
-        expect(tombstone.seq, equals(3));
+        final tombstone = storage.getEntry('key1');
+        expect(tombstone, isNotNull, reason: 'Tombstone should exist for deleted key');
+        expect(tombstone!.seq, equals(3));
       });
     });
 
@@ -422,8 +431,8 @@ void main() {
 
       test('APPEND on tombstoned key treats as empty string', () async {
         // Set and delete key
-        await processor.set('key', 'old', 'test-req');
-        await processor.delete('key', 'test-req');
+        await processor.set('key', 'old', 'test-req-set');
+        await processor.delete('key', 'test-req-del');
         
         final command = Command(id: 'req-1', op: 'APPEND', key: 'key', value: 'new');
         final response = await processor.processCommand(command);
@@ -470,8 +479,8 @@ void main() {
     group('MGET/MSET operations', () {
       test('MGET returns results in submission order', () async {
         // Set some test data
-        await processor.set('key1', 'value1', 'test-req');
-        await processor.set('key3', 'value3', 'test-req');
+        await processor.set('key1', 'value1', 'test-req-1');
+        await processor.set('key3', 'value3', 'test-req-3');
         // key2 intentionally missing
 
         final command = Command(
@@ -769,10 +778,10 @@ void main() {
 
     group('Sequence number management', () {
       test('increments sequence for each mutation', () async {
-        await processor.set('key1', 'value1', 'test-req');
-        await processor.set('key2', 'value2', 'test-req');
-        await processor.delete('key1', 'test-req');
-        await processor.set('key3', 'value3', 'test-req');
+        await processor.set('key1', 'value1', 'test-req-1');
+        await processor.set('key2', 'value2', 'test-req-2');
+        await processor.delete('key1', 'test-req-3');
+        await processor.set('key3', 'value3', 'test-req-4');
 
         final entry2 = storage.getEntry('key2')!;
         final tombstone1 = storage.getEntry('key1')!;
@@ -784,10 +793,10 @@ void main() {
       });
 
       test('does not increment sequence for GET operations', () async {
-        await processor.set('key1', 'value1', 'test-req');
-        await processor.get('key1', 'test-req');
-        await processor.get('missing-key', 'test-req');
-        await processor.set('key2', 'value2', 'test-req');
+        await processor.set('key1', 'value1', 'test-req-1');
+        await processor.get('key1', 'test-req-2');
+        await processor.get('missing-key', 'test-req-3');
+        await processor.set('key2', 'value2', 'test-req-4');
 
         final entry1 = storage.getEntry('key1')!;
         final entry2 = storage.getEntry('key2')!;
@@ -803,12 +812,12 @@ void main() {
         // Each emoji is 4 bytes in UTF-8
         final multiByteKey = '🚀' * 64; // 64 * 4 = 256 bytes exactly
 
-        final response = await processor.set(multiByteKey, 'value', 'test-req');
+        final response = await processor.set(multiByteKey, 'value', 'test-req-1');
         expect(response.status, equals(ResponseStatus.ok));
 
         // One more byte should fail
         final oversizedKey = multiByteKey + 'a'; // 257 bytes
-        final errorResponse = await processor.set(oversizedKey, 'value', 'test-req');
+        final errorResponse = await processor.set(oversizedKey, 'value', 'test-req-2');
         expect(errorResponse.errorCode, equals(ErrorCode.payloadTooLarge));
       });
 
@@ -817,12 +826,12 @@ void main() {
         final charCount = (256 * 1024) ~/ 4; // 4 bytes per emoji
         final maxValue = '🚀' * charCount;
 
-        final response = await processor.set('key', maxValue, 'test-req');
+        final response = await processor.set('key', maxValue, 'test-req-1');
         expect(response.status, equals(ResponseStatus.ok));
 
         // One more character should fail
         final oversizedValue = maxValue + '🚀';
-        final errorResponse = await processor.set('key2', oversizedValue, 'test-req');
+        final errorResponse = await processor.set('key2', oversizedValue, 'test-req-2');
         expect(errorResponse.errorCode, equals(ErrorCode.payloadTooLarge));
       });
     });

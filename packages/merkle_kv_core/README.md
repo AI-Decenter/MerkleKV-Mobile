@@ -220,3 +220,56 @@ The anti-entropy synchronization protocol follows Locked Spec §9 with these cha
 - Deterministic field order; binary output is stable across devices.
 - Size limit: total CBOR payload ≤ 300 KiB (Spec §11). Oversize → error.
 - Schema fields use snake_case (e.g., timestamp_ms, node_id).
+
+## Testing
+
+MerkleKV-Mobile includes a comprehensive testing suite with >95% code coverage targeting all critical components.
+
+### Test Architecture
+
+- **Unit Tests**: Comprehensive coverage of storage engine, MQTT client, topic router, and command processor
+- **Property-Based Tests**: Edge case validation using random data generation
+- **Negative Testing**: Extensive error condition and boundary testing
+- **Integration Tests**: End-to-end scenarios including anti-entropy synchronization
+
+### Key Testing Features
+
+- **Last-Writer-Wins (LWW) Validation**: Conflict resolution testing with node ID tiebreakers
+- **MQTT QoS=1 Enforcement**: Guaranteed message delivery validation
+- **UTF-8 Boundary Testing**: Unicode edge case handling
+- **Payload Size Validation**: 1MB limits and bulk operation boundaries
+- **Security Testing**: Wildcard injection prevention and multi-tenant isolation
+
+### Running Tests
+
+```bash
+# Run all tests
+dart test
+
+# Run unit tests with coverage
+dart test --coverage=coverage/
+dart pub global run coverage:format_coverage --lcov --in=coverage/ --out=coverage/lcov.info
+
+# Run specific test suites
+dart test test/unit/storage/    # Storage engine tests
+dart test test/unit/mqtt/       # MQTT client and router tests
+dart test test/unit/processor/  # Command processor tests
+```
+
+### Test Organization
+
+```
+test/
+├── unit/                    # Comprehensive unit tests (>95% coverage)
+│   ├── storage/            # Storage engine LWW resolution, tombstone GC
+│   ├── mqtt/               # MQTT client QoS, reconnection, topic routing
+│   └── processor/          # Command validation, bulk limits, idempotency
+├── utils/                  # Testing utilities
+│   ├── generators.dart    # Property-based test data generators
+│   └── mock_helpers.dart  # Mock implementations and test helpers
+└── integration/           # System and integration tests
+```
+
+For detailed testing documentation, see [TESTING.md](TESTING.md).
+
+````

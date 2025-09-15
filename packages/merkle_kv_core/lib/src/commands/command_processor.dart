@@ -254,6 +254,14 @@ class CommandProcessorImpl implements CommandProcessor {
 
   @override
   Future<Response> get(String key, String id) async {
+    // Check idempotency cache first
+    if (id.isNotEmpty) {
+      final cachedResponse = _getCachedResponse(id);
+      if (cachedResponse != null) {
+        return cachedResponse;
+      }
+    }
+
     final keyBytes = utf8.encode(key);
     if (keyBytes.length > _maxKeyBytes) {
       return Response.payloadTooLarge(id);
@@ -262,9 +270,20 @@ class CommandProcessorImpl implements CommandProcessor {
     try {
       final entry = await _storage.get(key);
       if (entry == null || entry.isTombstone) {
-        return Response.notFound(id);
+        final response = Response.notFound(id);
+        
+        // Do not cache error responses (including NOT_FOUND)
+        return response;
       }
-      return Response.ok(id: id, value: entry.value);
+      
+      final response = Response.ok(id: id, value: entry.value);
+      
+      // Cache successful response
+      if (id.isNotEmpty) {
+        _cacheResponse(id, response);
+      }
+      
+      return response;
     } catch (e) {
       return Response.internalError(id, 'Storage error: $e');
     }
@@ -272,6 +291,14 @@ class CommandProcessorImpl implements CommandProcessor {
 
   @override
   Future<Response> set(String key, String value, String id) async {
+    // Check idempotency cache first
+    if (id.isNotEmpty) {
+      final cachedResponse = _getCachedResponse(id);
+      if (cachedResponse != null) {
+        return cachedResponse;
+      }
+    }
+
     final keyBytes = utf8.encode(key);
     if (keyBytes.length > _maxKeyBytes) {
       return Response.payloadTooLarge(id);
@@ -295,7 +322,14 @@ class CommandProcessorImpl implements CommandProcessor {
       );
 
       await _storage.put(key, entry);
-      return Response.ok(id: id);
+      final response = Response.ok(id: id);
+      
+      // Cache successful response
+      if (id.isNotEmpty) {
+        _cacheResponse(id, response);
+      }
+      
+      return response;
     } catch (e) {
       return Response.internalError(id, 'Storage error: $e');
     }
@@ -303,6 +337,14 @@ class CommandProcessorImpl implements CommandProcessor {
 
   @override
   Future<Response> delete(String key, String id) async {
+    // Check idempotency cache first
+    if (id.isNotEmpty) {
+      final cachedResponse = _getCachedResponse(id);
+      if (cachedResponse != null) {
+        return cachedResponse;
+      }
+    }
+
     final keyBytes = utf8.encode(key);
     if (keyBytes.length > _maxKeyBytes) {
       return Response.payloadTooLarge(id);
@@ -313,7 +355,14 @@ class CommandProcessorImpl implements CommandProcessor {
       final seq = _nextSequenceNumber();
 
       await _storage.delete(key, timestampMs, _config.nodeId, seq);
-      return Response.ok(id: id);
+      final response = Response.ok(id: id);
+      
+      // Cache successful response
+      if (id.isNotEmpty) {
+        _cacheResponse(id, response);
+      }
+      
+      return response;
     } catch (e) {
       return Response.internalError(id, 'Storage error: $e');
     }
@@ -341,6 +390,14 @@ class CommandProcessorImpl implements CommandProcessor {
 
   @override
 Future<Response> mget(List<String> keys, String id) async {
+  // Check idempotency cache first
+  if (id.isNotEmpty) {
+    final cachedResponse = _getCachedResponse(id);
+    if (cachedResponse != null) {
+      return cachedResponse;
+    }
+  }
+
   final results = <KeyValueResult>[];
 
   // Process keys in submission order
@@ -373,11 +430,26 @@ Future<Response> mget(List<String> keys, String id) async {
     }
   }
 
-  return Response.bulk(id: id, results: results);
+  final response = Response.bulk(id: id, results: results);
+  
+  // Cache response
+  if (id.isNotEmpty) {
+    _cacheResponse(id, response);
+  }
+  
+  return response;
 }
 
 @override
 Future<Response> mset(Map<String, String> keyValues, String id) async {
+  // Check idempotency cache first
+  if (id.isNotEmpty) {
+    final cachedResponse = _getCachedResponse(id);
+    if (cachedResponse != null) {
+      return cachedResponse;
+    }
+  }
+
   final results = <KeyValueResult>[];
   
   // Process pairs in submission order (maintain map iteration order)
@@ -439,7 +511,14 @@ Future<Response> mset(Map<String, String> keyValues, String id) async {
     }
   }
 
-  return Response.bulk(id: id, results: results);
+  final response = Response.bulk(id: id, results: results);
+  
+  // Cache response
+  if (id.isNotEmpty) {
+    _cacheResponse(id, response);
+  }
+  
+  return response;
 }
 
   Future<Response> _performNumericOperation(
@@ -448,6 +527,14 @@ Future<Response> mset(Map<String, String> keyValues, String id) async {
     bool isIncrement,
     String id,
   ) async {
+    // Check idempotency cache first
+    if (id.isNotEmpty) {
+      final cachedResponse = _getCachedResponse(id);
+      if (cachedResponse != null) {
+        return cachedResponse;
+      }
+    }
+
     try {
       final keyBytes = utf8.encode(key);
       if (keyBytes.length > _maxKeyBytes) {
@@ -491,7 +578,14 @@ Future<Response> mset(Map<String, String> keyValues, String id) async {
 
       await _storage.put(key, entry);
 
-      return Response.ok(id: id, value: canonicalValue);
+      final response = Response.ok(id: id, value: canonicalValue);
+      
+      // Cache successful response
+      if (id.isNotEmpty) {
+        _cacheResponse(id, response);
+      }
+      
+      return response;
     } catch (e) {
       return Response.internalError(id, 'Numeric operation failed: $e');
     }
@@ -503,6 +597,14 @@ Future<Response> mset(Map<String, String> keyValues, String id) async {
     bool isAppend,
     String requestId,
   ) async {
+    // Check idempotency cache first
+    if (requestId.isNotEmpty) {
+      final cachedResponse = _getCachedResponse(requestId);
+      if (cachedResponse != null) {
+        return cachedResponse;
+      }
+    }
+
     try {
       // Validate key size
       final keyBytes = utf8.encode(key);
@@ -551,7 +653,14 @@ Future<Response> mset(Map<String, String> keyValues, String id) async {
       // Store the new value
       await _storage.put(key, entry);
 
-      return Response.ok(id: requestId, value: result);
+      final response = Response.ok(id: requestId, value: result);
+      
+      // Cache successful response
+      if (requestId.isNotEmpty) {
+        _cacheResponse(requestId, response);
+      }
+      
+      return response;
     } catch (e) {
       return Response.internalError(requestId, 'String operation failed: $e');
     }

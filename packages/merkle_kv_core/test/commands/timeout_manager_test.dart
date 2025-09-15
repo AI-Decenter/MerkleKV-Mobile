@@ -80,7 +80,10 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
       
       // Run cleanup - this should remove stale operations
-      timeoutManager.cleanupStaleOperations();
+      final cleanedCount = timeoutManager.cleanupStaleOperations();
+      
+      // Should have cleaned up 1 stale operation
+      expect(cleanedCount, equals(1));
       
       // After cleanup, the operation should be removed, so elapsed time should be zero
       expect(timeoutManager.getElapsedTime(requestId), Duration.zero);
