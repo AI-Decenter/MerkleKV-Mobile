@@ -157,89 +157,277 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
-      - name: Free up disk space
+      - name: Setup environment (before firewall)
         run: |
+          echo "🔧 Setting up complete environment before firewall activation..."
+          
+          # Free up disk space first
           echo "🧹 Freeing up disk space for enhanced testing..."
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc /usr/local/share/boost
           sudo rm -rf /usr/local/lib/node_modules
           docker system prune -af
+          
+          # Install system packages non-interactively
+          echo "📦 Installing system packages..."
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            htop \
+            sysstat \
+            wget \
+            curl \
+            unzip \
+            git \
+            build-essential \
+            lcov \
+            xmlstarlet \
+            jq
           sudo apt-get autoremove -y
           sudo apt-get autoclean -y
           df -h
           
-      - name: Setup Java
+      - name: Setup Java (before firewall)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
           
-      - name: Setup Flutter
+      - name: Setup Flutter (before firewall)
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
           
-      - name: Enable platforms and verify Flutter
+      - name: Configure Flutter and install dependencies (before firewall)
         run: |
+          echo "🔧 Configuring Flutter and installing all dependencies..."
           flutter config --enable-android
           flutter config --no-analytics
           flutter doctor -v
           
-      - name: Install dependencies
-        run: |
           echo "📦 Installing project dependencies..."
           flutter pub get
           cd apps/flutter_demo && flutter pub get
           
-      - name: Setup Melos for monorepo
-        run: |
+          echo "🔧 Setting up Melos for monorepo..."
           dart pub global activate melos
           melos bootstrap
           
-      - name: Enhanced Android Emulator Setup
-        id: emulator-setup
-        uses: ./.github/actions/setup-android-emulator
-        with:
-          api-level: ${{ matrix.api-level }}
-          target: ${{ matrix.target }}
-          arch: x86_64
-          emulator-name: enhanced_test_avd_${{ matrix.api-level }}_${{ matrix.target }}
-          memory: ${{ matrix.memory }}
-          disk-size: 6144
-          force-creation: false
-          enable-hardware-acceleration: true
-          wait-timeout: 900
+          echo "🧪 Pre-installing testing dependencies..."
+          cd apps/flutter_demo
           
-      - name: Performance Monitoring Setup
-        if: github.event.inputs.performance_monitoring != 'false'
+          # Add testing dependencies to pubspec.yaml if not already present
+          if ! grep -q "flutter_test:" pubspec.yaml; then
+            echo "Adding flutter_test dependency..."
+            sed -i '/dev_dependencies:/a \ \ flutter_test:\n\ \ \ \ sdk: flutter' pubspec.yaml
+          fi
+          
+          if ! grep -q "integration_test:" pubspec.yaml; then
+            echo "Adding integration_test dependency..."
+            sed -i '/dev_dependencies:/a \ \ integration_test:\n\ \ \ \ sdk: flutter' pubspec.yaml
+          fi
+          
+          # Install additional testing tools
+          flutter pub add --dev test
+          flutter pub add --dev mockito
+          flutter pub add --dev build_runner
+          flutter pub get
+          
+          echo "✅ All dependencies installed successfully"
+          
+      - name: Setup Android SDK and Emulator (before firewall)
         run: |
-          echo "📊 Setting up performance monitoring..."
+          echo "🤖 Setting up Android SDK and emulator components..."
           
-          # Create monitoring directories
-          mkdir -p test_output/performance
-          mkdir -p test_output/logs
-          mkdir -p test_output/screenshots
+          # Install Android SDK using the actions/setup-android equivalent
+          export ANDROID_HOME=$HOME/android-sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME  
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
           
-          # Install system monitoring tools
-          sudo apt-get update -qq
-          sudo apt-get install -y htop iostat sysstat
+          # Create Android SDK directory structure
+          mkdir -p $ANDROID_HOME
           
-          # Start background monitoring
-          (
-            echo "timestamp,cpu_usage,memory_usage,disk_io" > test_output/performance/system_metrics.csv
-            while true; do
-              timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-              cpu_usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | sed 's/%us,//')
-              memory_usage=$(free | grep Mem | awk '{printf "%.1f", $3/$2 * 100.0}')
-              disk_io=$(iostat -d 1 1 | tail -n +4 | awk '{sum+=$4} END {print sum}')
-              echo "$timestamp,$cpu_usage,$memory_usage,$disk_io" >> test_output/performance/system_metrics.csv
-              sleep 10
-            done
-          ) &
-          MONITOR_PID=$!
-          echo "MONITOR_PID=$MONITOR_PID" >> $GITHUB_ENV
+          # Download and install Android command line tools
+          cd $ANDROID_HOME
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
+          unzip -q commandlinetools-linux-*_latest.zip
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools/* cmdline-tools/latest/
+          rm commandlinetools-linux-*_latest.zip
           
-          echo "✅ Performance monitoring started (PID: $MONITOR_PID)"
+          # Accept Android SDK licenses
+          echo "📝 Accepting Android SDK licenses..."
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+          
+          # Install required SDK components
+          echo "📦 Installing required SDK components for API ${{ matrix.api-level }}..."
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "system-images;android-${{ matrix.api-level }};${{ matrix.target }};x86_64" \
+            "platforms;android-${{ matrix.api-level }}" \
+            "build-tools;34.0.0" \
+            "emulator" \
+            "platform-tools"
+          
+          # Add to environment for later steps
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/emulator" >> $GITHUB_PATH
+          
+          echo "✅ Android SDK setup completed"
+          
+      - name: Cache Android SDK and AVD
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/android-sdk
+            ~/.android/avd/*
+            ~/.android/adb*
+            ~/.android/cache/*
+          key: enhanced-android-sdk-avd-${{ matrix.api-level }}-${{ matrix.target }}-v4
+          restore-keys: |
+            enhanced-android-sdk-avd-${{ matrix.api-level }}-${{ matrix.target }}-
+            enhanced-android-sdk-avd-${{ matrix.api-level }}-
+            enhanced-android-sdk-avd-
+          
+      - name: Create and Start Android Emulator (post-setup)
+        id: emulator-setup
+        run: |
+          echo "🤖 Creating and starting Android emulator..."
+          
+          EMU_NAME="enhanced_test_avd_${{ matrix.api-level }}_${{ matrix.target }}"
+          
+          # Create AVD if it doesn't exist
+          if ! $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager list avd | grep -q "Name: $EMU_NAME"; then
+            echo "📱 Creating AVD: $EMU_NAME"
+            
+            # Create AVD
+            echo no | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
+              --force \
+              --name "$EMU_NAME" \
+              --abi "${{ matrix.target }}/x86_64" \
+              --package "system-images;android-${{ matrix.api-level }};${{ matrix.target }};x86_64" \
+              --device "pixel_5"
+            
+            # Configure AVD for optimal performance
+            AVD_CONFIG="$HOME/.android/avd/${EMU_NAME}.avd/config.ini"
+            
+            cat >> "$AVD_CONFIG" << EOF
+          
+          # Enhanced CI configuration
+          hw.gpu.enabled=yes
+          hw.gpu.mode=swiftshader_indirect
+          hw.ramSize=${{ matrix.memory }}
+          disk.dataPartition.size=6144M
+          hw.keyboard=yes
+          hw.cpu.ncore=2
+          hw.lcd.density=420
+          hw.lcd.height=2340
+          hw.lcd.width=1080
+          showDeviceFrame=no
+          hw.audioInput=no
+          hw.audioOutput=no
+          hw.camera.back=none
+          hw.camera.front=none
+          hw.gps=no
+          hw.sensors.orientation=no
+          hw.sensors.proximity=no
+          hw.dPad=no
+          hw.trackBall=no
+          hw.bluetooth=no
+          hw.wifi=yes
+          vm.heapSize=256
+          EOF
+            
+            echo "✅ AVD created and configured"
+          else
+            echo "✅ Using existing AVD: $EMU_NAME"
+          fi
+          
+          # Start emulator in background
+          echo "🚀 Starting Android emulator..."
+          EMU_OPTIONS="-no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
+          EMU_OPTIONS="$EMU_OPTIONS -camera-back none -camera-front none"
+          EMU_OPTIONS="$EMU_OPTIONS -memory ${{ matrix.memory }} -cores 2"
+          EMU_OPTIONS="$EMU_OPTIONS -netdelay none -netspeed full -accel on"
+          
+          $ANDROID_HOME/emulator/emulator -avd "$EMU_NAME" $EMU_OPTIONS &
+          EMULATOR_PID=$!
+          
+          echo "⏳ Waiting for emulator to start (max 900s)..."
+          
+          # Wait for device with timeout
+          timeout 900 adb wait-for-device || {
+            echo "❌ Emulator failed to start within 900s"
+            kill $EMULATOR_PID 2>/dev/null || true
+            exit 1
+          }
+          
+          echo "📱 Device detected, waiting for boot completion..."
+          
+          # Wait for boot completion with timeout
+          START_TIME=$(date +%s)
+          while true; do
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            
+            if [[ $ELAPSED -gt 900 ]]; then
+              echo "❌ Boot timeout after 900s"
+              kill $EMULATOR_PID 2>/dev/null || true
+              exit 1
+            fi
+            
+            BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')
+            if [[ "$BOOT_COMPLETED" == "1" ]]; then
+              echo "✅ Boot completed in ${ELAPSED}s"
+              break
+            fi
+            
+            echo "🔄 Boot progress... (${ELAPSED}s elapsed)"
+            sleep 5
+          done
+          
+          # Additional readiness checks
+          echo "🔍 Performing readiness checks..."
+          
+          # Wait for package manager
+          for i in {1..30}; do
+            if adb shell pm list packages >/dev/null 2>&1; then
+              echo "✅ Package manager ready"
+              break
+            fi
+            echo "⏳ Waiting for package manager... (attempt $i/30)"
+            sleep 2
+          done
+          
+          # Configure device for testing
+          echo "⚙️ Configuring device for testing..."
+          adb shell settings put global window_animation_scale 0.0
+          adb shell settings put global transition_animation_scale 0.0
+          adb shell settings put global animator_duration_scale 0.0
+          adb shell settings put secure show_ime_with_hard_keyboard 0
+          adb shell settings put system screen_off_timeout 1800000
+          adb shell settings put global stay_on_while_plugged_in 3
+          adb shell settings put system accelerometer_rotation 0
+          
+          # Wake up device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell input keyevent KEYCODE_MENU
+          adb shell input swipe 200 500 200 100
+          
+          # Get device information
+          DEVICE_ID=$(adb devices | grep -w device | head -1 | cut -f1)
+          API_LEVEL=$(adb shell getprop ro.build.version.sdk | tr -d '\r\n')
+          
+          echo "emulator-name=$EMU_NAME" >> $GITHUB_OUTPUT
+          echo "device-id=$DEVICE_ID" >> $GITHUB_OUTPUT
+          echo "api-level=$API_LEVEL" >> $GITHUB_OUTPUT
+          
+          echo "✅ Enhanced Android emulator setup completed successfully!"
+          echo "📱 Device ID: $DEVICE_ID"
+          echo "🔢 API Level: $API_LEVEL"
+          echo "📋 Emulator Name: $EMU_NAME"
           
       - name: Android Device Performance Monitoring
         if: github.event.inputs.performance_monitoring != 'false'
