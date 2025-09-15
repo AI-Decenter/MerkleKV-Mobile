@@ -54,7 +54,7 @@ class MqttClientImpl implements MqttClientInterface {
       _client.secure = true;
       _client.port = _config.mqttPort;
       // Validate server certificate by default (reject bad certificates)
-      _client.onBadCertificate = (certificate) => false;
+      _client.onBadCertificate = (Object certificate) => false;
     } else {
       _client.port = _config.mqttPort;
     }
