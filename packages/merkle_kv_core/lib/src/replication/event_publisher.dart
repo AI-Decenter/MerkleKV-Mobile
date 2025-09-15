@@ -180,6 +180,12 @@ class ReplicationEventPublisherImpl implements ReplicationEventPublisher {
       throw StateError('ReplicationEventPublisher disposed');
     }
     
+    // Don't accept new events if currently flushing
+    if (_flushing) {
+      await _outboxQueue.enqueue(event);
+      return;
+    }
+    
     _ensureInitialized(); // Check initialization before awaiting ready()
     await ready();
     

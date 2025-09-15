@@ -6,7 +6,6 @@ import '../../../lib/src/commands/command.dart';
 import '../../../lib/src/commands/response.dart';
 import '../../../lib/src/config/merkle_kv_config.dart';
 import '../../../lib/src/storage/storage_entry.dart';
-import '../../../lib/src/utils/bulk_operations.dart';
 import '../../utils/generators.dart';
 import '../../utils/mock_helpers.dart';
 

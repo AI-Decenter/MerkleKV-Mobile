@@ -42,6 +42,9 @@ class SimpleMockClient implements MqttClientInterface {
 
   @override
   Stream<ConnectionState> get connectionState => _controller!.stream;
+  
+  /// Get the current connection state
+  ConnectionState get currentState => _state;
 
   void _setState(ConnectionState state) {
     _state = state;

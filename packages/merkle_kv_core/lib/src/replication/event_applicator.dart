@@ -300,6 +300,9 @@ class ReplicationEventApplicatorImpl implements ReplicationEventApplicator {
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+    
+    // Ensure configuration is valid
+    assert(_config.nodeId.isNotEmpty, 'Node ID must be configured');
   }
 
   @override

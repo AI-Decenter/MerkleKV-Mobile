@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:test/test.dart';
 import 'package:merkle_kv_core/src/utils/payload_optimizer.dart';
 import 'package:merkle_kv_core/src/commands/command.dart';
-import 'package:merkle_kv_core/src/commands/response.dart';
 
 void main() {
   group('Payload Optimization Integration Tests', () {

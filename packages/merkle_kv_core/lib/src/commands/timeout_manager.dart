@@ -1,5 +1,3 @@
-import 'dart:async';
-
 /// Enumeration for different operation types with corresponding timeouts
 enum OperationType {
   /// Single key operations: 10 seconds

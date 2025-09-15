@@ -1,3 +1,6 @@
+@Tags(['broker-integration'])
+library;
+
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
@@ -8,7 +11,6 @@ import '../../lib/src/mqtt/mqtt_client_impl.dart';
 import '../../lib/src/utils/bulk_operations.dart';
 import '../../lib/src/storage/in_memory_storage.dart';
 import '../../lib/src/storage/storage_entry.dart';
-import '../../lib/src/replication/metrics.dart';
 
 /// Integration test configuration for multi-broker testing
 class BrokerTestConfig {
@@ -183,7 +185,6 @@ class IntegrationTestHelpers {
 }
 
 /// Main integration test suite for real MQTT brokers
-@Tags(['broker-integration'])
 void main() {
   group('Integration Tests with Real MQTT Brokers', () {
     late List<BrokerTestConfig> availableBrokers;

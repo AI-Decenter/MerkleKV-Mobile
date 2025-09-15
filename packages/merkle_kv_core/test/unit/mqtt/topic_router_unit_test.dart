@@ -1,11 +1,6 @@
-import 'dart:convert';
 import 'package:test/test.dart';
 import '../../../lib/src/mqtt/topic_router.dart';
-import '../../../lib/src/mqtt/topic_validator.dart';
-import '../../../lib/src/mqtt/connection_state.dart';
 import '../../../lib/src/config/merkle_kv_config.dart';
-import '../../../lib/src/config/invalid_config_exception.dart';
-import '../../utils/generators.dart';
 import '../../utils/mock_helpers.dart';
 
 void main() {

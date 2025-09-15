@@ -1,3 +1,6 @@
+@Tags(['convergence', 'broker-integration'])
+library;
+
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
@@ -164,7 +167,6 @@ class ConvergenceTestHelpers {
 
 /// Convergence testing with real MQTT brokers
 /// Tests specification compliance for anti-entropy timing
-@Tags(['convergence', 'broker-integration'])
 void main() {
   group('Convergence Testing with Real Brokers', () {
     const host = 'localhost';

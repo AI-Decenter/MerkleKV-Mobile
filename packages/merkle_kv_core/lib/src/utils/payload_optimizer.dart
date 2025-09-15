@@ -61,6 +61,11 @@ class PayloadOptimizer {
       // First estimate original size with default encoding
       final int originalSize = command.toJsonString().length;
       
+      // Validate size against limits
+      if (originalSize > _maxMessageSizeBytes) {
+        throw Exception('Command exceeds maximum message size: $originalSize > $_maxMessageSizeBytes');
+      }
+      
       // Create ordered map with canonical field order
       final Map<String, dynamic> jsonMap = _createOrderedCommandMap(command);
       

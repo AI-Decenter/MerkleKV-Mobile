@@ -11,6 +11,8 @@ void main() async {
     topicPrefix: 'production/cluster-a',
   );
 
+  print('Using configuration for node: ${config.nodeId}');
+
   // Topic scheme for replication
   final topicScheme = TopicScheme.create('production/cluster-a', 'client-1');
   print('Replication topic: ${topicScheme.replicationTopic}');
