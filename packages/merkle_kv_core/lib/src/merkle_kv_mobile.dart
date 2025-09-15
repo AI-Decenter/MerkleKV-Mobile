@@ -85,7 +85,7 @@ class MerkleKV {
       _updateConnectionState(ConnectionState.connecting);
 
       // Initialize storage
-      final storage = await StorageFactory.create(_config);
+      final storage = StorageFactory.create(_config);
 
       // Initialize command processor
       _commandProcessor = CommandProcessorImpl(_config, storage);
