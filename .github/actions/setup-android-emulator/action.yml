@@ -1,0 +1,311 @@
+name: 'Setup Enhanced Android Emulator'
+description: 'Sets up Android emulator with enhanced reliability for CI/CD'
+
+inputs:
+  api-level:
+    description: 'Android API level'
+    required: false
+    default: '33'
+  target:
+    description: 'System image target (default, google_apis, google_apis_playstore)'
+    required: false
+    default: 'google_apis'
+  arch:
+    description: 'CPU architecture'
+    required: false
+    default: 'x86_64'
+  emulator-name:
+    description: 'Custom emulator name'
+    required: false
+    default: ''
+  memory:
+    description: 'RAM size in MB'
+    required: false
+    default: '3072'
+  disk-size:
+    description: 'Disk size in MB'
+    required: false
+    default: '4096'
+  force-creation:
+    description: 'Force creation of new AVD'
+    required: false
+    default: 'false'
+  enable-hardware-acceleration:
+    description: 'Enable hardware acceleration'
+    required: false
+    default: 'true'
+  wait-timeout:
+    description: 'Maximum wait time for emulator boot (seconds)'
+    required: false
+    default: '600'
+
+outputs:
+  emulator-name:
+    description: 'Name of the created/used emulator'
+    value: ${{ steps.setup.outputs.emulator-name }}
+  device-id:
+    description: 'Android device ID'
+    value: ${{ steps.setup.outputs.device-id }}
+  api-level:
+    description: 'Actual API level of the emulator'
+    value: ${{ steps.setup.outputs.api-level }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        echo "🔍 Validating inputs..."
+        echo "API Level: ${{ inputs.api-level }}"
+        echo "Target: ${{ inputs.target }}"
+        echo "Architecture: ${{ inputs.arch }}"
+        echo "Memory: ${{ inputs.memory }}MB"
+        echo "Disk Size: ${{ inputs.disk-size }}MB"
+        
+        # Validate API level
+        if [[ ! "${{ inputs.api-level }}" =~ ^[0-9]+$ ]] || [[ "${{ inputs.api-level }}" -lt 21 ]] || [[ "${{ inputs.api-level }}" -gt 34 ]]; then
+          echo "❌ Invalid API level: ${{ inputs.api-level }}. Must be between 21 and 34."
+          exit 1
+        fi
+        
+        # Validate target
+        case "${{ inputs.target }}" in
+          default|google_apis|google_apis_playstore)
+            echo "✅ Valid target: ${{ inputs.target }}"
+            ;;
+          *)
+            echo "❌ Invalid target: ${{ inputs.target }}. Must be one of: default, google_apis, google_apis_playstore"
+            exit 1
+            ;;
+        esac
+
+    - name: Free up disk space
+      shell: bash
+      run: |
+        echo "🧹 Freeing up disk space for emulator..."
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc 2>/dev/null || true
+        docker system prune -af 2>/dev/null || true
+        df -h
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: ${{ inputs.api-level }}
+        target: ${{ inputs.target }}
+        arch: ${{ inputs.arch }}
+
+    - name: Accept Android SDK licenses
+      shell: bash
+      run: |
+        echo "📝 Accepting Android SDK licenses..."
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+
+    - name: Install required SDK components
+      shell: bash
+      run: |
+        echo "📦 Installing required SDK components..."
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          "system-images;android-${{ inputs.api-level }};${{ inputs.target }};${{ inputs.arch }}" \
+          "platforms;android-${{ inputs.api-level }}" \
+          "build-tools;34.0.0" \
+          "emulator" \
+          "platform-tools"
+
+    - name: Setup enhanced emulator
+      id: setup
+      shell: bash
+      run: |
+        echo "🤖 Setting up enhanced Android emulator..."
+        
+        # Determine emulator name
+        if [[ -n "${{ inputs.emulator-name }}" ]]; then
+          EMU_NAME="${{ inputs.emulator-name }}"
+        else
+          EMU_NAME="enhanced_test_avd_${{ inputs.api-level }}_${{ inputs.target }}"
+        fi
+        
+        echo "emulator-name=$EMU_NAME" >> $GITHUB_OUTPUT
+        
+        # Create AVD if it doesn't exist or force creation is enabled
+        if [[ "${{ inputs.force-creation }}" == "true" ]] || ! $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager list avd | grep -q "Name: $EMU_NAME"; then
+          echo "📱 Creating AVD: $EMU_NAME"
+          
+          # Remove existing AVD if force creation
+          if [[ "${{ inputs.force-creation }}" == "true" ]]; then
+            $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager delete avd -n "$EMU_NAME" 2>/dev/null || true
+          fi
+          
+          # Create AVD
+          echo no | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
+            --force \
+            --name "$EMU_NAME" \
+            --abi "${{ inputs.target }}/${{ inputs.arch }}" \
+            --package "system-images;android-${{ inputs.api-level }};${{ inputs.target }};${{ inputs.arch }}" \
+            --device "pixel_5"
+          
+          # Configure AVD for optimal performance
+          AVD_CONFIG="$HOME/.android/avd/${EMU_NAME}.avd/config.ini"
+          
+          cat >> "$AVD_CONFIG" << EOF
+        
+        # Enhanced CI configuration
+        hw.gpu.enabled=yes
+        hw.gpu.mode=swiftshader_indirect
+        hw.ramSize=${{ inputs.memory }}
+        disk.dataPartition.size=${{ inputs.disk-size }}M
+        hw.keyboard=yes
+        hw.cpu.ncore=2
+        hw.lcd.density=420
+        hw.lcd.height=2340
+        hw.lcd.width=1080
+        showDeviceFrame=no
+        hw.audioInput=no
+        hw.audioOutput=no
+        hw.camera.back=none
+        hw.camera.front=none
+        hw.gps=no
+        hw.sensors.orientation=no
+        hw.sensors.proximity=no
+        hw.dPad=no
+        hw.trackBall=no
+        hw.bluetooth=no
+        hw.wifi=yes
+        vm.heapSize=256
+        EOF
+          
+          echo "✅ AVD created and configured"
+        else
+          echo "✅ Using existing AVD: $EMU_NAME"
+        fi
+
+    - name: Cache AVD
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.android/avd/*
+          ~/.android/adb*
+          ~/.android/cache/*
+        key: enhanced-avd-${{ inputs.api-level }}-${{ inputs.target }}-${{ inputs.arch }}-v3
+        restore-keys: |
+          enhanced-avd-${{ inputs.api-level }}-${{ inputs.target }}-
+          enhanced-avd-${{ inputs.api-level }}-
+          enhanced-avd-
+
+    - name: Start emulator and wait for readiness
+      shell: bash
+      run: |
+        echo "🚀 Starting Android emulator..."
+        
+        EMU_NAME="${{ steps.setup.outputs.emulator-name }}"
+        
+        # Prepare emulator options
+        EMU_OPTIONS="-no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
+        EMU_OPTIONS="$EMU_OPTIONS -camera-back none -camera-front none"
+        EMU_OPTIONS="$EMU_OPTIONS -memory ${{ inputs.memory }} -cores 2"
+        EMU_OPTIONS="$EMU_OPTIONS -netdelay none -netspeed full"
+        
+        if [[ "${{ inputs.enable-hardware-acceleration }}" == "true" ]]; then
+          EMU_OPTIONS="$EMU_OPTIONS -accel on"
+        fi
+        
+        # Start emulator in background
+        $ANDROID_HOME/emulator/emulator -avd "$EMU_NAME" $EMU_OPTIONS &
+        EMULATOR_PID=$!
+        
+        echo "⏳ Waiting for emulator to start (max ${{ inputs.wait-timeout }}s)..."
+        
+        # Wait for device with timeout
+        timeout ${{ inputs.wait-timeout }} adb wait-for-device || {
+          echo "❌ Emulator failed to start within ${{ inputs.wait-timeout }}s"
+          kill $EMULATOR_PID 2>/dev/null || true
+          exit 1
+        }
+        
+        echo "📱 Device detected, waiting for boot completion..."
+        
+        # Wait for boot completion with timeout
+        START_TIME=$(date +%s)
+        while true; do
+          CURRENT_TIME=$(date +%s)
+          ELAPSED=$((CURRENT_TIME - START_TIME))
+          
+          if [[ $ELAPSED -gt ${{ inputs.wait-timeout }} ]]; then
+            echo "❌ Boot timeout after ${{ inputs.wait-timeout }}s"
+            kill $EMULATOR_PID 2>/dev/null || true
+            exit 1
+          fi
+          
+          BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')
+          if [[ "$BOOT_COMPLETED" == "1" ]]; then
+            echo "✅ Boot completed in ${ELAPSED}s"
+            break
+          fi
+          
+          echo "🔄 Boot progress... (${ELAPSED}s elapsed)"
+          sleep 5
+        done
+        
+        # Additional readiness checks
+        echo "🔍 Performing readiness checks..."
+        
+        # Wait for package manager
+        for i in {1..30}; do
+          if adb shell pm list packages >/dev/null 2>&1; then
+            echo "✅ Package manager ready"
+            break
+          fi
+          echo "⏳ Waiting for package manager... (attempt $i/30)"
+          sleep 2
+        done
+        
+        # Configure device for testing
+        echo "⚙️ Configuring device for testing..."
+        adb shell settings put global window_animation_scale 0.0
+        adb shell settings put global transition_animation_scale 0.0
+        adb shell settings put global animator_duration_scale 0.0
+        adb shell settings put secure show_ime_with_hard_keyboard 0
+        adb shell settings put system screen_off_timeout 1800000
+        adb shell settings put global stay_on_while_plugged_in 3
+        adb shell settings put system accelerometer_rotation 0
+        
+        # Wake up device
+        adb shell input keyevent KEYCODE_WAKEUP
+        adb shell input keyevent KEYCODE_MENU
+        adb shell input swipe 200 500 200 100
+        
+        # Get device information
+        DEVICE_ID=$(adb devices | grep -w device | head -1 | cut -f1)
+        API_LEVEL=$(adb shell getprop ro.build.version.sdk | tr -d '\r\n')
+        
+        echo "device-id=$DEVICE_ID" >> $GITHUB_OUTPUT
+        echo "api-level=$API_LEVEL" >> $GITHUB_OUTPUT
+        
+        echo "✅ Enhanced Android emulator setup completed successfully!"
+        echo "📱 Device ID: $DEVICE_ID"
+        echo "🔢 API Level: $API_LEVEL"
+        echo "📋 Emulator Name: $EMU_NAME"
+
+    - name: Verify emulator functionality
+      shell: bash
+      run: |
+        echo "🧪 Verifying emulator functionality..."
+        
+        # Basic connectivity test
+        adb shell echo "Hello from Android emulator" || {
+          echo "❌ Basic connectivity test failed"
+          exit 1
+        }
+        
+        # System info
+        echo "📊 System Information:"
+        echo "Android Version: $(adb shell getprop ro.build.version.release | tr -d '\r\n')"
+        echo "API Level: $(adb shell getprop ro.build.version.sdk | tr -d '\r\n')"
+        echo "CPU ABI: $(adb shell getprop ro.product.cpu.abi | tr -d '\r\n')"
+        echo "Available Memory: $(adb shell cat /proc/meminfo | grep MemAvailable | awk '{print $2}')KB"
+        
+        # Performance check
+        LOAD_AVG=$(adb shell cat /proc/loadavg | awk '{print $1}')
+        echo "System Load: $LOAD_AVG"
+        
+        echo "✅ Emulator functionality verification completed"

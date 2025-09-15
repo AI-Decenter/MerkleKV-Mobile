@@ -60,6 +60,43 @@ The mobile E2E testing suite focuses on **spec-compliant convergence behavior** 
 ## 🚀 Running Tests
 
 ### Prerequisites
+
+#### Android Testing Setup
+
+For reliable Android testing, use the enhanced emulator setup:
+
+```bash
+# Quick setup with defaults
+./scripts/setup_android_emulator.sh
+
+# Custom configuration
+./scripts/setup_android_emulator.sh \
+  --api-level 33 \
+  --target google_apis \
+  --memory 3072 \
+  --ci-mode
+
+# Verify emulator status
+./scripts/android_emulator_helper.sh health
+```
+
+See [Android Emulator Setup Guide](../../docs/android-emulator-setup.md) for comprehensive configuration options.
+
+#### iOS Testing Setup (macOS only)
+
+```bash
+# Start iOS Simulator
+open -a Simulator
+
+# List available simulators
+xcrun simctl list devices available
+
+# Start specific simulator
+xcrun simctl boot "iPhone 15 Pro"
+```
+
+#### General Prerequisites
+
 ```bash
 # Ensure Flutter is installed
 flutter --version
@@ -67,11 +104,8 @@ flutter --version
 # Install dependencies
 flutter pub get
 
-# For Android testing
-flutter devices  # Verify Android emulator/device
-
-# For iOS testing (macOS only)
-open -a Simulator  # Start iOS Simulator
+# Verify device connectivity
+flutter devices
 ```
 
 ### Running All Tests
@@ -125,6 +159,32 @@ Tests generate comprehensive reports in `test_output/reports/`:
 - **JSON Report**: `mobile_e2e_report.json` - Programmatic analysis
 
 ## 🔧 CI/CD Integration
+
+### Enhanced Android Emulator Support
+
+The testing framework includes enhanced Android emulator setup for reliable CI/CD environments:
+
+```yaml
+# Use the custom Android emulator action
+- name: Setup Enhanced Android Emulator
+  uses: ./.github/actions/setup-android-emulator
+  with:
+    api-level: '33'
+    target: 'google_apis'
+    memory: '3072'
+    wait-timeout: '600'
+
+- name: Run Android E2E Tests
+  run: |
+    dart test/mobile_e2e/run_mobile_e2e_tests.dart --platform android --verbose
+```
+
+**Key Features**:
+- Optimized AVD creation and caching
+- Enhanced device readiness checks
+- Comprehensive error handling and debugging
+- Matrix testing across Android API levels
+- Automatic cleanup and resource management
 
 ### Firebase Test Lab
 ```yaml
@@ -260,6 +320,9 @@ flutter devices
 # Verify Flutter installation
 flutter doctor
 
+# Android emulator diagnostics
+./scripts/android_emulator_helper.sh troubleshoot
+
 # Test individual components
 flutter test test/mobile_e2e/helpers/mobile_test_harness.dart
 
@@ -267,8 +330,25 @@ flutter test test/mobile_e2e/helpers/mobile_test_harness.dart
 dart test/mobile_e2e/run_mobile_e2e_tests.dart --help
 ```
 
+### Enhanced Android Debugging
+
+```bash
+# Device setup and health check
+./scripts/android_emulator_helper.sh setup
+
+# Collect device information
+./scripts/android_emulator_helper.sh info
+
+# Perform comprehensive health check
+./scripts/android_emulator_helper.sh health
+
+# Clean device state
+./scripts/android_emulator_helper.sh cleanup
+```
+
 ## 📚 Related Documentation
 
+- [Enhanced Android Emulator Setup](../../docs/android-emulator-setup.md)
 - [MerkleKV Core API](../../packages/merkle_kv_core/README.md)
 - [Architecture Documentation](../../docs/architecture.md)
 - [Deployment Guide](../../docs/DEPLOYMENT.md)

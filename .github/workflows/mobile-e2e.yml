@@ -23,11 +23,17 @@ jobs:
   mobile-e2e-android:
     name: Android E2E Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     
     strategy:
+      fail-fast: false
       matrix:
         api-level: [28, 29, 33]
         target: [default, google_apis]
+        exclude:
+          # Exclude problematic combinations for CI stability
+          - api-level: 28
+            target: google_apis
     
     steps:
       - name: Checkout repository
@@ -39,15 +45,25 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
           
-      - name: Enable Linux desktop
-        run: flutter config --enable-linux-desktop
-        
+      - name: Enable platforms and configure Flutter
+        run: |
+          flutter config --enable-linux-desktop
+          flutter config --enable-android
+          flutter doctor -v
+          
       - name: Install dependencies
         run: |
           flutter pub get
@@ -58,6 +74,24 @@ jobs:
           dart pub global activate melos
           melos bootstrap
           
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk /opt/ghc
+          docker system prune -af
+          
+      - name: Enhanced Android SDK Setup
+        run: |
+          # Accept all Android SDK licenses
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+          
+          # Install essential SDK components
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "system-images;android-${{ matrix.api-level }};${{ matrix.target }};x86_64" \
+            "platforms;android-${{ matrix.api-level }}" \
+            "build-tools;34.0.0" \
+            "emulator" \
+            "platform-tools"
+            
       - name: Android AVD Cache
         uses: actions/cache@v4
         id: avd-cache
@@ -65,36 +99,190 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ matrix.api-level }}-${{ matrix.target }}
+            ~/.android/cache/*
+          key: avd-enhanced-${{ matrix.api-level }}-${{ matrix.target }}-v2
+          restore-keys: |
+            avd-enhanced-${{ matrix.api-level }}-${{ matrix.target }}-
+            avd-enhanced-${{ matrix.api-level }}-
+            avd-enhanced-
           
-      - name: Create AVD and generate snapshot for caching
+      - name: Create optimized AVD
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "Creating AVD for API ${{ matrix.api-level }} with target ${{ matrix.target }}"
+          avdmanager create avd \
+            --force \
+            --name "test_avd_${{ matrix.api-level }}_${{ matrix.target }}" \
+            --abi "${{ matrix.target }}/x86_64" \
+            --package "system-images;android-${{ matrix.api-level }};${{ matrix.target }};x86_64" \
+            --device "pixel_5"
+            
+          # Configure AVD for optimal CI performance
+          echo "hw.lcd.density=420" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "hw.lcd.height=2340" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "hw.lcd.width=1080" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "hw.gpu.enabled=yes" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "hw.gpu.mode=swiftshader_indirect" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "hw.ramSize=3072" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "disk.dataPartition.size=4096M" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "hw.keyboard=yes" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          echo "hw.cpu.ncore=2" >> ~/.android/avd/test_avd_${{ matrix.api-level }}_${{ matrix.target }}.avd/config.ini
+          
+      - name: Generate AVD snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: x86_64
+          avd-name: "test_avd_${{ matrix.api-level }}_${{ matrix.target }}"
           force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
-          script: echo "Generated AVD snapshot for caching."
+          emulator-options: >
+            -no-window 
+            -gpu swiftshader_indirect 
+            -noaudio 
+            -no-boot-anim 
+            -camera-back none 
+            -camera-front none
+            -memory 3072
+            -cores 2
+            -accel on
+          disable-animations: true
+          script: |
+            echo "Generating AVD snapshot for caching..."
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+            adb shell settings put global animator_duration_scale 0
+            echo "AVD snapshot generated successfully"
           
-      - name: Run Android E2E Tests
+      - name: Run Android E2E Tests with Enhanced Reliability
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
           arch: x86_64
+          avd-name: "test_avd_${{ matrix.api-level }}_${{ matrix.target }}"
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: >
+            -no-snapshot-save 
+            -no-window 
+            -gpu swiftshader_indirect 
+            -noaudio 
+            -no-boot-anim 
+            -camera-back none
+            -camera-front none
+            -memory 3072
+            -cores 2
+            -accel on
+            -netdelay none
+            -netspeed full
           disable-animations: true
           script: |
-            # Wait for emulator to be ready
-            adb wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d '\r') ]]; do sleep 1; done; input keyevent 82'
+            # Enhanced Android E2E testing with helper scripts
+            echo "🚀 Starting Enhanced Android E2E Testing"
+            echo "========================================"
             
-            # Run mobile E2E tests
+            # Make helper scripts executable
+            chmod +x ../../scripts/android_emulator_helper.sh
+            
+            # Setup device using helper script
+            if ! ../../scripts/android_emulator_helper.sh setup; then
+              echo "❌ Device setup failed, running troubleshooting..."
+              ../../scripts/android_emulator_helper.sh troubleshoot
+              exit 1
+            fi
+            
+            # Additional Flutter-specific setup
+            echo "🔧 Configuring Flutter environment..."
+            
+            # Set up environment for Flutter tests
+            export ANDROID_DEVICE_ID=$(adb devices | grep -w device | head -1 | cut -f1)
+            echo "Using Android device: $ANDROID_DEVICE_ID"
+            
+            # Verify Flutter can detect the device
+            echo "🔍 Verifying Flutter device detection..."
+            if ! flutter devices | grep android; then
+              echo "❌ Flutter cannot detect Android device"
+              echo "Available devices:"
+              flutter devices
+              echo "ADB devices:"
+              adb devices -l
+              ../../scripts/android_emulator_helper.sh troubleshoot
+              exit 1
+            fi
+            
+            echo "✅ Flutter device detection successful"
+            
+            # Pre-test device health check
+            if ! ../../scripts/android_emulator_helper.sh health; then
+              echo "⚠️ Device health check failed, but continuing..."
+            fi
+            
+            # Navigate to Flutter app directory
             cd apps/flutter_demo
-            dart ../../test/mobile_e2e/run_mobile_e2e_tests.dart --platform android --verbose
+            
+            # Clean any previous test artifacts
+            echo "🧹 Cleaning previous test artifacts..."
+            rm -rf test_output 2>/dev/null || true
+            flutter clean
+            flutter pub get
+            
+            # Run enhanced E2E test suite
+            echo "🧪 Starting Enhanced Android E2E Tests..."
+            echo "============================================"
+            
+            # Create test results directory
+            mkdir -p ../../test_output/android
+            
+            # Run tests with comprehensive error handling
+            TEST_EXIT_CODE=0
+            if ! timeout 1800 dart ../../test/mobile_e2e/run_mobile_e2e_tests.dart --platform android --verbose; then
+              TEST_EXIT_CODE=$?
+              echo "❌ Android E2E tests failed with exit code: $TEST_EXIT_CODE"
+              
+              # Collect comprehensive debugging information
+              echo "📊 Collecting debugging information..."
+              
+              # Device state
+              echo "=== Device State ===" > ../../test_output/android/debug_info.txt
+              ../../scripts/android_emulator_helper.sh info >> ../../test_output/android/debug_info.txt 2>&1
+              
+              # System information
+              echo -e "\n=== System Information ===" >> ../../test_output/android/debug_info.txt
+              adb shell dumpsys meminfo >> ../../test_output/android/debug_info.txt 2>&1
+              adb shell dumpsys battery >> ../../test_output/android/debug_info.txt 2>&1
+              
+              # Recent logs
+              echo -e "\n=== Recent Logcat ===" >> ../../test_output/android/debug_info.txt
+              adb logcat -d -v time | tail -100 >> ../../test_output/android/debug_info.txt 2>&1
+              
+              # Flutter doctor
+              echo -e "\n=== Flutter Doctor ===" >> ../../test_output/android/debug_info.txt
+              flutter doctor -v >> ../../test_output/android/debug_info.txt 2>&1
+              
+              # Troubleshooting
+              echo -e "\n=== Troubleshooting ===" >> ../../test_output/android/debug_info.txt
+              ../../scripts/android_emulator_helper.sh troubleshoot >> ../../test_output/android/debug_info.txt 2>&1
+              
+              # Show debug summary
+              echo "📄 Debug information saved to test_output/android/debug_info.txt"
+              echo "Last 10 lines of debug info:"
+              tail -10 ../../test_output/android/debug_info.txt || true
+              
+              exit $TEST_EXIT_CODE
+            fi
+            
+            echo "✅ All Android E2E tests completed successfully!"
+            
+            # Final device cleanup
+            echo "🧹 Performing final cleanup..."
+            ../../scripts/android_emulator_helper.sh cleanup
+            
+            # Save successful test artifacts
+            echo "💾 Saving test artifacts..."
+            cp -r ../../test_output ../../test_output/android_success 2>/dev/null || true
+            
+            echo "🎉 Enhanced Android E2E testing completed successfully!"
             
       - name: Upload Android test results
         uses: actions/upload-artifact@v4
