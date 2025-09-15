@@ -4,6 +4,15 @@
 tags:
   integration:
     description: "Integration tests that require external dependencies (e.g., MQTT broker)"
+    timeout: 3m
+  
+  broker-integration:
+    description: "Tests that require real MQTT brokers running"
+    timeout: 5m
+    
+  convergence:
+    description: "Anti-entropy convergence tests with extended timeouts"
+    timeout: 10m
 
 # Default test configuration
 timeout: 30s

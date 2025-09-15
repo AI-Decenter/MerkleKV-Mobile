@@ -1,0 +1,8 @@
+admin:password123
+tenant_a_user1:password123
+tenant_a_user2:password123
+tenant_b_user1:password123
+tenant_b_user2:password123
+readonly_user:password123
+device_001:password123
+device_002:password123

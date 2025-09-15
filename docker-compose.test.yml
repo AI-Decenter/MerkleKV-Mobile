@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: merkle_kv_mosquitto_test
+    restart: unless-stopped
+    ports:
+      - "1883:1883"    # MQTT
+      - "8883:8883"    # MQTT over TLS
+    volumes:
+      - ./test/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./test/mosquitto-tls:/mosquitto/config/tls:ro
+      - ./test/mosquitto-acl.conf:/mosquitto/config/acl.conf:ro
+      - ./test/mosquitto-passwd:/mosquitto/config/passwd:ro
+      - mosquitto_test_data:/mosquitto/data
+      - mosquitto_test_logs:/mosquitto/log
+    environment:
+      - TZ=UTC
+    networks:
+      - merkle_kv_test_network
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 | grep -q '[0-9]' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: merkle_kv_hivemq_test
+    restart: unless-stopped
+    ports:
+      - "1884:1883"    # MQTT (different port to avoid conflicts)
+      - "8884:8883"    # MQTT over TLS (different port)
+    volumes:
+      - ./test/hivemq-config:/opt/hivemq/conf:ro
+      - ./test/hivemq-tls:/opt/hivemq/conf/tls:ro
+      - hivemq_test_data:/opt/hivemq/data
+      - hivemq_test_logs:/opt/hivemq/log
+    environment:
+      - TZ=UTC
+      - HIVEMQ_ALLOW_ALL_CLIENTS=false
+    networks:
+      - merkle_kv_test_network
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/uptime' -C 1 | grep -q '[0-9]' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # Network simulation container for partition testing
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.5.0
+    container_name: merkle_kv_toxiproxy_test
+    restart: unless-stopped
+    ports:
+      - "8474:8474"    # Toxiproxy API
+      - "1885:1885"    # Proxied Mosquitto MQTT
+      - "8885:8885"    # Proxied Mosquitto MQTT TLS
+      - "1886:1886"    # Proxied HiveMQ MQTT
+      - "8886:8886"    # Proxied HiveMQ MQTT TLS
+    networks:
+      - merkle_kv_test_network
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      hivemq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8474/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  merkle_kv_test_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  mosquitto_test_data:
+    driver: local
+  mosquitto_test_logs:
+    driver: local
+  hivemq_test_data:
+    driver: local
+  hivemq_test_logs:
+    driver: local

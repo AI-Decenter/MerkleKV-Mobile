@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hivemq xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="config.xsd">
+
+    <!-- MQTT Configuration -->
+    <mqtt>
+        <!-- Maximum message size (1MB for testing) -->
+        <max-message-size>1048576</max-message-size>
+        <!-- Session expiry for testing -->
+        <session-expiry>
+            <max-interval>86400</max-interval>
+        </session-expiry>
+        <!-- Keep alive settings -->
+        <keep-alive>
+            <max-keep-alive>65535</max-keep-alive>
+        </keep-alive>
+        <!-- Topic alias settings -->
+        <topic-alias>
+            <enabled>true</enabled>
+            <max-per-client>10</max-per-client>
+        </topic-alias>
+        <!-- Packet size for MQTT 5.0 -->
+        <max-packet-size>1048576</max-packet-size>
+    </mqtt>
+
+    <!-- Network Listeners -->
+    <listeners>
+        <!-- Standard MQTT Listener -->
+        <tcp-listener>
+            <port>1883</port>
+            <bind-address>0.0.0.0</bind-address>
+        </tcp-listener>
+
+        <!-- TLS MQTT Listener -->
+        <tls-tcp-listener>
+            <port>8883</port>
+            <bind-address>0.0.0.0</bind-address>
+            <tls>
+                <keystore>
+                    <path>/opt/hivemq/conf/tls/keystore.jks</path>
+                    <password>password123</password>
+                    <private-key-password>password123</private-key-password>
+                </keystore>
+                <truststore>
+                    <path>/opt/hivemq/conf/tls/truststore.jks</path>
+                    <password>password123</password>
+                </truststore>
+                <client-authentication-mode>NONE</client-authentication-mode>
+                <protocols>
+                    <protocol>TLSv1.2</protocol>
+                    <protocol>TLSv1.3</protocol>
+                </protocols>
+            </tls>
+        </tls-tcp-listener>
+    </listeners>
+
+    <!-- Security -->
+    <security>
+        <!-- Allow anonymous connections for testing -->
+        <allow-empty-client-id>true</allow-empty-client-id>
+        <payload-format-validation>false</payload-format-validation>
+        <utf8-validation>true</utf8-validation>
+        <allow-request-problem-information>true</allow-request-problem-information>
+    </security>
+
+    <!-- Shared Subscriptions -->
+    <shared-subscriptions>
+        <enabled>true</enabled>
+    </shared-subscriptions>
+
+    <!-- Retained Messages -->
+    <retained-messages>
+        <enabled>true</enabled>
+    </retained-messages>
+
+    <!-- Wildcard Subscriptions -->
+    <wildcard-subscriptions>
+        <enabled>true</enabled>
+    </wildcard-subscriptions>
+
+    <!-- Quality of Service -->
+    <mqtt>
+        <queued-messages>
+            <max-queue-size>1000</max-queue-size>
+            <strategy>discard</strategy>
+        </queued-messages>
+    </mqtt>
+
+    <!-- Persistence -->
+    <persistence>
+        <mode>file</mode>
+        <file-persistence>
+            <persistence-folder>/opt/hivemq/data</persistence-folder>
+            <snapshot-interval>300</snapshot-interval>
+        </file-persistence>
+    </persistence>
+
+    <!-- MQTT 5.0 Features -->
+    <mqtt>
+        <server-identifier>hivemq-test-broker</server-identifier>
+    </mqtt>
+
+</hivemq>
