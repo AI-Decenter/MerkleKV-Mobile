@@ -39,6 +39,14 @@ scripts:
       failFast: true
     packageFilters:
       flutter: true
+
+  test:mobile:e2e:
+    description: Run mobile E2E tests (integration tests)
+    run: dart test/mobile_e2e/run_mobile_e2e_tests.dart
+    exec:
+      failFast: true
+    packageFilters:
+      flutter: true
   
   test:all:
     description: Run all tests in the monorepo
@@ -47,6 +55,8 @@ scripts:
       melos run test:melos:dart || echo "No Dart-only packages with tests"
       echo "Running Flutter tests..."
       melos run test:melos:flutter || echo "No Flutter packages with tests"
+      echo "Running Mobile E2E tests..."
+      melos run test:mobile:e2e || echo "Mobile E2E tests not available"
   
   format:
     run: dart format --set-exit-if-changed .
