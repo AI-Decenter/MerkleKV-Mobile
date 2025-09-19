@@ -40,14 +40,8 @@ class TestSessionManager {
         return;
       }
 
-      // Check if Docker is available
-      final dockerCheck = await Process.run('docker', ['--version']);
-      if (dockerCheck.exitCode != 0) {
-        print('⚠️ Docker not available in CI environment - skipping MQTT broker startup');
-        print('ℹ️ Tests will use external MQTT broker if available');
-        _brokerStarted = true; // Mark as started to skip cleanup
-        return;
-      }
+      // Ensure Docker is available and setup
+      await _ensureDockerAvailable();
 
       // Remove existing container if it exists
       await Process.run('docker', ['rm', '-f', 'e2e-mqtt-broker']);
@@ -83,6 +77,91 @@ class TestSessionManager {
     }
   }
 
+  /// Ensure Docker is available, try to install/setup if needed
+  Future<void> _ensureDockerAvailable() async {
+    // Check if Docker is available
+    var dockerCheck = await Process.run('docker', ['--version']);
+    if (dockerCheck.exitCode == 0) {
+      print('✅ Docker is available');
+      return;
+    }
+
+    print('⚠️ Docker not found, attempting to setup...');
+    
+    // Try different approaches based on OS
+    if (Platform.isMacOS) {
+      await _setupDockerOnMacOS();
+    } else if (Platform.isLinux) {
+      await _setupDockerOnLinux();
+    } else {
+      throw StateError('Docker not available and cannot be installed on this platform');
+    }
+
+    // Verify Docker is now available
+    dockerCheck = await Process.run('docker', ['--version']);
+    if (dockerCheck.exitCode != 0) {
+      throw StateError('Docker setup failed - still not available');
+    }
+    
+    print('✅ Docker setup completed successfully');
+  }
+
+  /// Setup Docker on macOS (for CI environments)
+  Future<void> _setupDockerOnMacOS() async {
+    print('🔧 Setting up Docker on macOS...');
+    
+    // In GitHub Actions macOS, Docker might be available but not in PATH
+    // Try common Docker locations
+    final dockerPaths = [
+      '/usr/local/bin/docker',
+      '/Applications/Docker.app/Contents/Resources/bin/docker',
+      '/opt/homebrew/bin/docker',
+    ];
+
+    for (final path in dockerPaths) {
+      if (await File(path).exists()) {
+        print('📍 Found Docker at: $path');
+        // Create symlink to make it available in PATH
+        await Process.run('sudo', ['ln', '-sf', path, '/usr/local/bin/docker']);
+        return;
+      }
+    }
+
+    // If not found, try to install via Homebrew (if available)
+    final brewCheck = await Process.run('which', ['brew']);
+    if (brewCheck.exitCode == 0) {
+      print('🍺 Installing Docker via Homebrew...');
+      await Process.run('brew', ['install', '--cask', 'docker']);
+      return;
+    }
+
+    throw StateError('Docker not found and cannot be installed on macOS');
+  }
+
+  /// Setup Docker on Linux
+  Future<void> _setupDockerOnLinux() async {
+    print('🔧 Setting up Docker on Linux...');
+    
+    // Check if we have permission to install packages
+    final sudoCheck = await Process.run('sudo', ['-n', 'true']);
+    if (sudoCheck.exitCode != 0) {
+      throw StateError('Cannot install Docker - sudo access required');
+    }
+
+    // Install Docker using apt (Ubuntu/Debian)
+    try {
+      await Process.run('sudo', ['apt-get', 'update']);
+      await Process.run('sudo', ['apt-get', 'install', '-y', 'docker.io']);
+      
+      // Start Docker service
+      await Process.run('sudo', ['systemctl', 'start', 'docker']);
+      await Process.run('sudo', ['systemctl', 'enable', 'docker']);
+      
+    } catch (error) {
+      throw StateError('Failed to install Docker on Linux: $error');
+    }
+  }
+
   /// Check if MQTT broker is already running on port 1883
   Future<bool> _isBrokerAlreadyRunning() async {
     try {
@@ -113,10 +192,10 @@ class TestSessionManager {
     print('🛑 Stopping MQTT broker...');
     
     try {
-      // Check if Docker is available before trying to stop container
+      // Check if Docker is available
       final dockerCheck = await Process.run('docker', ['--version']);
       if (dockerCheck.exitCode != 0) {
-        print('ℹ️ Docker not available - skipping container cleanup');
+        print('⚠️ Docker not available - cannot stop container');
         _brokerStarted = false;
         return;
       }
