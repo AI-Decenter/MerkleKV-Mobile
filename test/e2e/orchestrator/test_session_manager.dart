@@ -33,10 +33,51 @@ class TestSessionManager {
     print('🚀 Starting MQTT broker...');
     
     try {
+      // First check if MQTT is already running
+      if (await _isMqttBrokerRunning()) {
+        print('✅ MQTT broker already accessible on port 1883');
+        _brokerStarted = true;
+        return;
+      }
+
+      // Try Docker first, then fallback to local mosquitto
+      bool dockerStarted = await _tryStartDockerBroker();
+      
+      if (!dockerStarted) {
+        await _startLocalMosquitto();
+      }
+      
+      // Verify broker is accessible
+      await _verifyBrokerConnectivity();
+      
+      _brokerStarted = true;
+      print('✅ MQTT broker started successfully');
+      
+    } catch (error) {
+      print('❌ Failed to start MQTT broker: $error');
+      rethrow;
+    }
+  }
+
+  /// Check if MQTT broker is already running
+  Future<bool> _isMqttBrokerRunning() async {
+    try {
+      final socket = await Socket.connect('localhost', 1883, timeout: Duration(seconds: 2));
+      await socket.close();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /// Try to start Docker broker
+  Future<bool> _tryStartDockerBroker() async {
+    try {
       // Check if Docker is available
       final dockerCheck = await Process.run('docker', ['--version']);
       if (dockerCheck.exitCode != 0) {
-        throw StateError('Docker is required but not available');
+        print('⚠️ Docker not available, trying local mosquitto');
+        return false;
       }
 
       // Remove existing container if it exists
@@ -55,28 +96,50 @@ class TestSessionManager {
       );
 
       if (dockerRun.exitCode != 0) {
-        throw StateError('Failed to start Docker container: ${dockerRun.stderr}');
+        print('⚠️ Docker start failed: ${dockerRun.stderr}');
+        return false;
       }
 
-      // Wait for broker to start
-      await Future.delayed(Duration(seconds: 3));
-      
-      // Verify broker is accessible
-      await _verifyBrokerConnectivity();
-      
-      _brokerStarted = true;
-      print('✅ MQTT broker started successfully');
-      
+      // Wait for broker to start (optimized for faster testing)
+      await Future.delayed(Duration(seconds: 1));
+      return true;
+
     } catch (error) {
-      print('❌ Failed to start MQTT broker: $error');
-      rethrow;
+      print('⚠️ Docker error: $error, trying local mosquitto');
+      return false;
     }
   }
 
-  /// Verify MQTT broker connectivity
+  /// Start local mosquitto broker
+  Future<void> _startLocalMosquitto() async {
+    try {
+      print('🔄 Starting local mosquitto broker...');
+      
+      // Check if mosquitto is available
+      final mosquittoCheck = await Process.run('which', ['mosquitto']);
+      if (mosquittoCheck.exitCode != 0) {
+        throw StateError('Neither Docker nor local mosquitto available');
+      }
+
+      // Start mosquitto with default config
+      final result = await Process.run('mosquitto', ['-v']);
+      if (result.exitCode != 0) {
+        throw StateError('Failed to start local mosquitto: ${result.stderr}');
+      }
+
+      // Wait for broker to start (optimized for faster testing)
+      await Future.delayed(Duration(seconds: 1));
+      print('✅ Local mosquitto broker started');
+      
+    } catch (error) {
+      throw StateError('Failed to start local mosquitto: $error');
+    }
+  }
+
+  /// Verify MQTT broker connectivity (fast mode)
   Future<void> _verifyBrokerConnectivity() async {
     try {
-      final socket = await Socket.connect('localhost', 1883, timeout: Duration(seconds: 5));
+      final socket = await Socket.connect('localhost', 1883, timeout: Duration(seconds: 2));
       await socket.close();
     } catch (error) {
       throw StateError('MQTT broker is not accessible: $error');
@@ -92,20 +155,24 @@ class TestSessionManager {
     print('🛑 Stopping MQTT broker...');
     
     try {
-      // Stop the Docker container
+      // Try to stop Docker container first
       final stopResult = await Process.run(
         'docker',
         ['stop', 'e2e-mqtt-broker'],
       );
       
       if (stopResult.exitCode == 0) {
-        print('✅ MQTT broker stopped successfully');
+        print('✅ Docker MQTT broker stopped successfully');
+        await Process.run('docker', ['rm', 'e2e-mqtt-broker']);
       } else {
-        print('⚠️ Warning: Failed to stop MQTT broker cleanly');
+        // If Docker stop failed, try to stop local mosquitto
+        final killResult = await Process.run('pkill', ['-f', 'mosquitto']);
+        if (killResult.exitCode == 0) {
+          print('✅ Local MQTT broker stopped successfully');
+        } else {
+          print('⚠️ Warning: Failed to stop MQTT broker cleanly');
+        }
       }
-
-      // Remove the container
-      await Process.run('docker', ['rm', 'e2e-mqtt-broker']);
       
       _brokerStarted = false;
       
