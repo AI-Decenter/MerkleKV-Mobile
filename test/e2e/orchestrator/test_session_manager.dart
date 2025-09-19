@@ -6,6 +6,7 @@ import '../scenarios/e2e_scenario.dart';
 class TestSessionManager {
   final Map<String, TestSession> _activeSessions = {};
   bool _brokerStarted = false;
+  Process? _mosquittoProcess;
 
   /// Initialize a new test session for the given scenario
   Future<TestSession> initializeSession(E2EScenario scenario) async {
@@ -40,31 +41,13 @@ class TestSessionManager {
         return;
       }
 
-      // Ensure Docker is available and setup
-      await _ensureDockerAvailable();
-
-      // Remove existing container if it exists
-      await Process.run('docker', ['rm', '-f', 'e2e-mqtt-broker']);
-
-      // Start Mosquitto broker in Docker
-      final dockerRun = await Process.run(
-        'docker',
-        [
-          'run',
-          '-d',
-          '--name', 'e2e-mqtt-broker',
-          '-p', '1883:1883',
-          'eclipse-mosquitto:1.6'
-        ],
-      );
-
-      if (dockerRun.exitCode != 0) {
-        throw StateError('Failed to start Docker container: ${dockerRun.stderr}');
+      // Try native mosquitto first (faster for CI), then Docker as fallback
+      bool started = await _tryStartNativeMosquitto();
+      if (!started) {
+        print('🔄 Native mosquitto failed, trying Docker...');
+        await _startDockerMosquitto();
       }
 
-      // Wait for broker to start
-      await Future.delayed(Duration(seconds: 1));
-      
       // Verify broker is accessible
       await _verifyBrokerConnectivity();
       
@@ -77,89 +60,107 @@ class TestSessionManager {
     }
   }
 
-  /// Ensure Docker is available, try to install/setup if needed
-  Future<void> _ensureDockerAvailable() async {
-    // Check if Docker is available
-    var dockerCheck = await Process.run('docker', ['--version']);
-    if (dockerCheck.exitCode == 0) {
-      print('✅ Docker is available');
-      return;
-    }
-
-    print('⚠️ Docker not found, attempting to setup...');
-    
-    // Try different approaches based on OS
-    if (Platform.isMacOS) {
-      await _setupDockerOnMacOS();
-    } else if (Platform.isLinux) {
-      await _setupDockerOnLinux();
-    } else {
-      throw StateError('Docker not available and cannot be installed on this platform');
-    }
-
-    // Verify Docker is now available
-    dockerCheck = await Process.run('docker', ['--version']);
-    if (dockerCheck.exitCode != 0) {
-      throw StateError('Docker setup failed - still not available');
-    }
-    
-    print('✅ Docker setup completed successfully');
-  }
-
-  /// Setup Docker on macOS (for CI environments)
-  Future<void> _setupDockerOnMacOS() async {
-    print('🔧 Setting up Docker on macOS...');
-    
-    // In GitHub Actions macOS, Docker might be available but not in PATH
-    // Try common Docker locations
-    final dockerPaths = [
-      '/usr/local/bin/docker',
-      '/Applications/Docker.app/Contents/Resources/bin/docker',
-      '/opt/homebrew/bin/docker',
-    ];
-
-    for (final path in dockerPaths) {
-      if (await File(path).exists()) {
-        print('📍 Found Docker at: $path');
-        // Create symlink to make it available in PATH
-        await Process.run('sudo', ['ln', '-sf', path, '/usr/local/bin/docker']);
-        return;
-      }
-    }
-
-    // If not found, try to install via Homebrew (if available)
-    final brewCheck = await Process.run('which', ['brew']);
-    if (brewCheck.exitCode == 0) {
-      print('🍺 Installing Docker via Homebrew...');
-      await Process.run('brew', ['install', '--cask', 'docker']);
-      return;
-    }
-
-    throw StateError('Docker not found and cannot be installed on macOS');
-  }
-
-  /// Setup Docker on Linux
-  Future<void> _setupDockerOnLinux() async {
-    print('🔧 Setting up Docker on Linux...');
-    
-    // Check if we have permission to install packages
-    final sudoCheck = await Process.run('sudo', ['-n', 'true']);
-    if (sudoCheck.exitCode != 0) {
-      throw StateError('Cannot install Docker - sudo access required');
-    }
-
-    // Install Docker using apt (Ubuntu/Debian)
+  /// Try to start native mosquitto broker (preferred for CI)
+  Future<bool> _tryStartNativeMosquitto() async {
     try {
-      await Process.run('sudo', ['apt-get', 'update']);
-      await Process.run('sudo', ['apt-get', 'install', '-y', 'docker.io']);
+      // Check if mosquitto is available
+      var mosquittoCheck = await Process.run('which', ['mosquitto']);
+      if (mosquittoCheck.exitCode != 0) {
+        // Try to install mosquitto on macOS
+        if (Platform.isMacOS) {
+          print('📦 Installing mosquitto via Homebrew...');
+          final brewCheck = await Process.run('which', ['brew']);
+          if (brewCheck.exitCode == 0) {
+            await Process.run('brew', ['install', 'mosquitto']);
+            mosquittoCheck = await Process.run('which', ['mosquitto']);
+          }
+        }
+        // Try to install on Linux
+        else if (Platform.isLinux) {
+          print('📦 Installing mosquitto via apt...');
+          await Process.run('sudo', ['apt-get', 'update'], runInShell: true);
+          await Process.run('sudo', ['apt-get', 'install', '-y', 'mosquitto'], runInShell: true);
+          mosquittoCheck = await Process.run('which', ['mosquitto']);
+        }
+        
+        if (mosquittoCheck.exitCode != 0) {
+          print('⚠️ mosquitto not available, trying Docker fallback...');
+          return false;
+        }
+      }
+
+      print('🦟 Starting native mosquitto broker...');
       
-      // Start Docker service
-      await Process.run('sudo', ['systemctl', 'start', 'docker']);
-      await Process.run('sudo', ['systemctl', 'enable', 'docker']);
+      // Create a simple config file
+      final configContent = '''
+port 1883
+allow_anonymous true
+listener 1883 0.0.0.0
+''';
+      await File('/tmp/mosquitto_test.conf').writeAsString(configContent);
+
+      // Start mosquitto with config
+      _mosquittoProcess = await Process.start(
+        'mosquitto', 
+        ['-c', '/tmp/mosquitto_test.conf'],
+      );
+
+      // Wait for broker to start
+      await Future.delayed(Duration(seconds: 2));
+      
+      // Verify native mosquitto is working
+      try {
+        final socket = await Socket.connect('localhost', 1883, timeout: Duration(seconds: 2));
+        await socket.close();
+        print('✅ Native mosquitto broker started');
+        return true;
+      } catch (error) {
+        print('⚠️ Native mosquitto started but not accessible on port 1883');
+        // Kill the process and return false to try Docker
+        _mosquittoProcess?.kill();
+        _mosquittoProcess = null;
+        return false;
+      }
       
     } catch (error) {
-      throw StateError('Failed to install Docker on Linux: $error');
+      print('⚠️ Failed to start native mosquitto: $error');
+      return false;
     }
+  }
+
+  /// Start MQTT broker using Docker (fallback)
+  Future<void> _startDockerMosquitto() async {
+    print('🐳 Starting Docker mosquitto broker...');
+    
+    // Check if Docker is available
+    final dockerCheck = await Process.run('docker', ['--version']);
+    if (dockerCheck.exitCode != 0) {
+      throw StateError('Neither mosquitto nor Docker is available. Please install one of them.');
+    }
+
+    // Remove existing container if it exists
+    await Process.run('docker', ['rm', '-f', 'e2e-mqtt-broker']);
+
+    // Start Mosquitto broker in Docker
+    final dockerRun = await Process.run(
+      'docker',
+      [
+        'run',
+        '-d',
+        '--name', 'e2e-mqtt-broker',
+        '-p', '1883:1883',
+        'eclipse-mosquitto:1.6'
+      ],
+    );
+
+    if (dockerRun.exitCode != 0) {
+      throw StateError('Failed to start Docker container: ${dockerRun.stderr}');
+    }
+
+    // Wait for broker to start
+    await Future.delayed(Duration(seconds: 3));
+    
+    print('✅ Docker mosquitto broker started');
   }
 
   /// Check if MQTT broker is already running on port 1883
@@ -192,28 +193,35 @@ class TestSessionManager {
     print('🛑 Stopping MQTT broker...');
     
     try {
-      // Check if Docker is available
-      final dockerCheck = await Process.run('docker', ['--version']);
-      if (dockerCheck.exitCode != 0) {
-        print('⚠️ Docker not available - cannot stop container');
+      // Stop native mosquitto process if running
+      if (_mosquittoProcess != null) {
+        print('🦟 Stopping native mosquitto...');
+        _mosquittoProcess!.kill();
+        await _mosquittoProcess!.exitCode;
+        _mosquittoProcess = null;
+        
+        // Clean up config file
+        try {
+          await File('/tmp/mosquitto_test.conf').delete();
+        } catch (e) {
+          // Ignore if file doesn't exist
+        }
+        
+        print('✅ Native mosquitto stopped');
         _brokerStarted = false;
         return;
       }
 
-      // Stop the Docker container
-      final stopResult = await Process.run(
-        'docker',
-        ['stop', 'e2e-mqtt-broker'],
-      );
-      
-      if (stopResult.exitCode == 0) {
-        print('✅ MQTT broker stopped successfully');
-      } else {
-        print('⚠️ Warning: Failed to stop MQTT broker cleanly');
+      // Try to stop Docker container
+      final dockerCheck = await Process.run('docker', ['--version']);
+      if (dockerCheck.exitCode == 0) {
+        final stopResult = await Process.run('docker', ['stop', 'e2e-mqtt-broker']);
+        if (stopResult.exitCode == 0) {
+          print('✅ Docker MQTT broker stopped successfully');
+        }
+        // Remove the container
+        await Process.run('docker', ['rm', 'e2e-mqtt-broker']);
       }
-
-      // Remove the container
-      await Process.run('docker', ['rm', 'e2e-mqtt-broker']);
       
       _brokerStarted = false;
       
