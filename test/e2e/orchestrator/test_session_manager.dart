@@ -5,7 +5,6 @@ import '../scenarios/e2e_scenario.dart';
 /// Manages test sessions including setup, cleanup, and resource management
 class TestSessionManager {
   final Map<String, TestSession> _activeSessions = {};
-  Process? _mqttBrokerProcess;
   bool _brokerStarted = false;
 
   /// Initialize a new test session for the given scenario
@@ -40,18 +39,24 @@ class TestSessionManager {
         throw StateError('Docker is required but not available');
       }
 
+      // Remove existing container if it exists
+      await Process.run('docker', ['rm', '-f', 'e2e-mqtt-broker']);
+
       // Start Mosquitto broker in Docker
-      _mqttBrokerProcess = await Process.start(
+      final dockerRun = await Process.run(
         'docker',
         [
           'run',
-          '--rm',
+          '-d',
           '--name', 'e2e-mqtt-broker',
           '-p', '1883:1883',
-          '-d',
           'eclipse-mosquitto:1.6'
         ],
       );
+
+      if (dockerRun.exitCode != 0) {
+        throw StateError('Failed to start Docker container: ${dockerRun.stderr}');
+      }
 
       // Wait for broker to start
       await Future.delayed(Duration(seconds: 3));
@@ -65,6 +70,16 @@ class TestSessionManager {
     } catch (error) {
       print('❌ Failed to start MQTT broker: $error');
       rethrow;
+    }
+  }
+
+  /// Verify MQTT broker connectivity
+  Future<void> _verifyBrokerConnectivity() async {
+    try {
+      final socket = await Socket.connect('localhost', 1883, timeout: Duration(seconds: 5));
+      await socket.close();
+    } catch (error) {
+      throw StateError('MQTT broker is not accessible: $error');
     }
   }
 
@@ -88,22 +103,14 @@ class TestSessionManager {
       } else {
         print('⚠️ Warning: Failed to stop MQTT broker cleanly');
       }
+
+      // Remove the container
+      await Process.run('docker', ['rm', 'e2e-mqtt-broker']);
       
-      _mqttBrokerProcess = null;
       _brokerStarted = false;
       
     } catch (error) {
       print('❌ Error stopping MQTT broker: $error');
-    }
-  }
-
-  /// Verify MQTT broker connectivity
-  Future<void> _verifyBrokerConnectivity() async {
-    try {
-      final socket = await Socket.connect('localhost', 1883, timeout: Duration(seconds: 5));
-      await socket.close();
-    } catch (error) {
-      throw StateError('MQTT broker is not accessible: $error');
     }
   }
 
