@@ -24,6 +24,11 @@ abstract class E2EScenario {
     this.requiresAppLaunch = true,
     this.initialNetworkState,
   });
+  
+  @override
+  String toString() {
+    return 'E2EScenario(name: "$name", description: "$description", steps: ${steps.length}, iOS: true)';
+  }
 }
 
 /// Individual step within an E2E scenario
@@ -76,6 +81,8 @@ enum NetworkState {
   airplaneMode,
   wifiToCellular,
   cellularToWifi,
+  both,
+  vpn,
 }
 
 /// Specific scenario for mobile lifecycle testing
@@ -125,6 +132,29 @@ enum NetworkTransition {
   airplaneModeToggle,
   networkInterruption,
   poorConnectivity,
+}
+
+/// Security testing scenario
+class SecurityScenario extends E2EScenario {
+  final SecurityLevel securityLevel;
+  
+  SecurityScenario({
+    required super.name,
+    required super.description,
+    required super.steps,
+    required this.securityLevel,
+    super.preConditions,
+    super.postConditions,
+    super.timeout,
+  });
+}
+
+/// Security levels for testing
+enum SecurityLevel {
+  low,
+  medium,
+  high,
+  critical,
 }
 
 /// Convergence testing scenario

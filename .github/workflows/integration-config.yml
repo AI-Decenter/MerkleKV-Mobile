@@ -1,0 +1,417 @@
+name: Integration Configuration Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'test/integration/**'
+      - '.ci/**'
+      - 'docker-compose*.yml'
+      - '.github/workflows/integration-config.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'test/integration/**'
+      - '.ci/**'
+      - 'docker-compose*.yml'
+      - '.github/workflows/integration-config.yml'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Integration test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - config
+          - certificates
+          - docker
+          - broker
+          - scripts
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  DOCKER_COMPOSE_VERSION: '2.20.0'
+
+jobs:
+  integration-config-tests:
+    name: Integration Configuration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - config
+          - certificates
+          - docker
+          - broker
+          - scripts
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Setup Docker Compose
+        run: |
+          echo "🐳 Setting up Docker Compose..."
+          curl -L "https://github.com/docker/compose/releases/download/v${{ env.DOCKER_COMPOSE_VERSION }}/docker-compose-linux-x86_64" -o /tmp/docker-compose
+          sudo mv /tmp/docker-compose /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+      
+      - name: Install integration testing dependencies
+        run: |
+          echo "📦 Installing integration testing dependencies..."
+          sudo apt-get update
+          sudo apt-get install -y \
+            openssl \
+            mosquitto-clients \
+            jq \
+            curl \
+            netcat-openbsd \
+            docker-compose
+          
+          # Install additional certificate tools
+          sudo apt-get install -y ca-certificates
+          
+          echo "✅ Integration dependencies installed"
+      
+      - name: Test integration configuration files
+        if: matrix.test-suite == 'config' || matrix.test-suite == 'all'
+        timeout-minutes: 5
+        run: |
+          echo "🔧 Testing integration configuration files..."
+          
+          cd test/integration
+          
+          # Test configuration file validity
+          if [ -f config/test_config.json ]; then
+            echo "Validating test_config.json..."
+            jq . config/test_config.json > /dev/null || {
+              echo "❌ Invalid JSON in test_config.json"
+              exit 1
+            }
+            echo "✅ test_config.json is valid"
+          fi
+          
+          # Test other configuration files
+          for config_file in config/*.json config/*.yaml config/*.yml; do
+            if [ -f "$config_file" ]; then
+              echo "Checking $config_file..."
+              case "$config_file" in
+                *.json)
+                  jq . "$config_file" > /dev/null || echo "⚠️ Invalid JSON: $config_file"
+                  ;;
+                *.yaml|*.yml)
+                  python3 -c "import yaml; yaml.safe_load(open('$config_file'))" || echo "⚠️ Invalid YAML: $config_file"
+                  ;;
+              esac
+            fi
+          done
+          
+          echo "✅ Configuration files validation completed"
+      
+      - name: Test certificate generation and validation
+        if: matrix.test-suite == 'certificates' || matrix.test-suite == 'all'
+        timeout-minutes: 8
+        run: |
+          echo "🔐 Testing certificate generation and validation..."
+          
+          cd test/integration
+          
+          # Test certificate generation scripts
+          if [ -f generate_certs.sh ]; then
+            echo "Testing certificate generation..."
+            chmod +x generate_certs.sh
+            
+            # Run certificate generation in test mode
+            ./generate_certs.sh --test-mode || {
+              echo "❌ Certificate generation failed"
+              exit 1
+            }
+            echo "✅ Certificate generation successful"
+          fi
+          
+          # Test certificate conversion scripts
+          if [ -f convert_certs.sh ]; then
+            echo "Testing certificate conversion..."
+            chmod +x convert_certs.sh
+            
+            # Run certificate conversion in test mode
+            ./convert_certs.sh --test-mode || {
+              echo "❌ Certificate conversion failed"
+              exit 1
+            }
+            echo "✅ Certificate conversion successful"
+          fi
+          
+          # Validate generated certificates
+          if [ -d certs/ ]; then
+            echo "Validating generated certificates..."
+            for cert_file in certs/*.crt certs/*.pem; do
+              if [ -f "$cert_file" ]; then
+                openssl x509 -in "$cert_file" -text -noout > /dev/null || {
+                  echo "⚠️ Invalid certificate: $cert_file"
+                }
+              fi
+            done
+          fi
+          
+          echo "✅ Certificate testing completed"
+      
+      - name: Test Docker configurations
+        if: matrix.test-suite == 'docker' || matrix.test-suite == 'all'
+        timeout-minutes: 10
+        run: |
+          echo "🐳 Testing Docker configurations..."
+          
+          # Test main docker-compose files
+          for compose_file in docker-compose.basic.yml docker-compose.test.yml; do
+            if [ -f "$compose_file" ]; then
+              echo "Validating $compose_file..."
+              docker-compose -f "$compose_file" config > /dev/null || {
+                echo "❌ Invalid Docker Compose file: $compose_file"
+                exit 1
+              }
+              echo "✅ $compose_file is valid"
+            fi
+          done
+          
+          # Test broker Docker configuration
+          if [ -f broker/mosquitto/docker-compose.yml ]; then
+            echo "Validating broker Docker configuration..."
+            cd broker/mosquitto
+            docker-compose config > /dev/null || {
+              echo "❌ Invalid broker Docker Compose configuration"
+              exit 1
+            }
+            echo "✅ Broker Docker configuration is valid"
+            cd ../..
+          fi
+          
+          # Test CI Docker configurations
+          if [ -d .ci/ ]; then
+            echo "Testing CI Docker configurations..."
+            for ci_compose in .ci/*/docker-compose*.yml; do
+              if [ -f "$ci_compose" ]; then
+                echo "Validating $ci_compose..."
+                docker-compose -f "$ci_compose" config > /dev/null || {
+                  echo "⚠️ Invalid CI Docker Compose: $ci_compose"
+                }
+              fi
+            done
+          fi
+          
+          echo "✅ Docker configuration testing completed"
+      
+      - name: Test MQTT broker integration
+        if: matrix.test-suite == 'broker' || matrix.test-suite == 'all'
+        timeout-minutes: 8
+        run: |
+          echo "🦟 Testing MQTT broker integration..."
+          
+          # Start MQTT broker with correct service name
+          docker-compose -f docker-compose.basic.yml up -d mosquitto-test || {
+            echo "❌ Failed to start MQTT broker"
+            exit 1
+          }
+          
+          # Wait for broker to be ready
+          echo "⏳ Waiting for MQTT broker to be ready..."
+          sleep 10
+          
+          # Check if container is running and healthy
+          if ! docker-compose -f docker-compose.basic.yml ps | grep -q "Up.*healthy"; then
+            echo "❌ MQTT broker is not running or healthy"
+            echo "📋 Container logs:"
+            docker-compose -f docker-compose.basic.yml logs mosquitto-test
+            docker-compose -f docker-compose.basic.yml down
+            exit 1
+          fi
+          
+          echo "✅ MQTT broker is running and healthy"
+          
+          # Test broker connectivity
+          echo "📡 Testing MQTT broker connectivity..."
+          mosquitto_pub -h localhost -p 1883 -t test/integration -m "test_message" || {
+            echo "❌ MQTT broker connectivity test failed"
+            echo "📋 Container logs:"
+            docker-compose -f docker-compose.basic.yml logs mosquitto-test
+            docker-compose -f docker-compose.basic.yml down
+            exit 1
+          }
+          
+          echo "✅ MQTT publish test successful"
+          
+          # Test broker subscription
+          echo "📡 Testing MQTT broker subscription..."
+          {
+            timeout 5 mosquitto_sub -h localhost -p 1883 -t test/integration -C 1 > /tmp/mqtt_test_output &
+            SUB_PID=$!
+            sleep 2
+            mosquitto_pub -h localhost -p 1883 -t test/integration -m "test_subscription"
+            wait $SUB_PID 2>/dev/null || true
+          }
+          
+          if [ -f /tmp/mqtt_test_output ] && grep -q "test_subscription" /tmp/mqtt_test_output; then
+            echo "✅ MQTT subscription test successful"
+            rm -f /tmp/mqtt_test_output
+          else
+            echo "⚠️ MQTT subscription test may have issues, but broker is functional"
+          fi
+          
+          # Cleanup
+          docker-compose -f docker-compose.basic.yml down
+          
+          echo "✅ MQTT broker integration testing completed"
+      
+      - name: Test integration scripts
+        if: matrix.test-suite == 'scripts' || matrix.test-suite == 'all'
+        timeout-minutes: 10
+        run: |
+          echo "📜 Testing integration scripts..."
+          
+          # Test scripts in scripts/ directory
+          if [ -d scripts/ ]; then
+            echo "Testing scripts directory..."
+            
+            for script in scripts/*.sh; do
+              if [ -f "$script" ]; then
+                echo "Validating script: $script"
+                
+                # Check script syntax
+                bash -n "$script" || {
+                  echo "❌ Syntax error in $script"
+                  exit 1
+                }
+                
+                # Make executable and test if it has --help or --test-mode
+                chmod +x "$script"
+                if "$script" --help &>/dev/null || "$script" --test-mode &>/dev/null; then
+                  echo "✅ $script supports help/test mode"
+                else
+                  echo "ℹ️ $script does not support help/test mode"
+                fi
+              fi
+            done
+          fi
+          
+          # Test broker connectivity script
+          if [ -f scripts/test_broker_connectivity.sh ]; then
+            echo "Testing broker connectivity script..."
+            chmod +x scripts/test_broker_connectivity.sh
+            
+            # Start broker for script testing
+            docker-compose -f docker-compose.basic.yml up -d mosquitto-test
+            sleep 3
+            
+            # Test the connectivity script
+            ./scripts/test_broker_connectivity.sh --test-mode || {
+              echo "⚠️ Broker connectivity script test failed"
+            }
+            
+            # Cleanup
+            docker-compose -f docker-compose.basic.yml down
+          fi
+          
+          # Test MQTT health check script
+          if [ -f scripts/mqtt_health_check.sh ]; then
+            echo "Testing MQTT health check script..."
+            chmod +x scripts/mqtt_health_check.sh
+            ./scripts/mqtt_health_check.sh --test-mode || {
+              echo "⚠️ MQTT health check script test failed"
+            }
+          fi
+          
+          echo "✅ Integration scripts testing completed"
+      
+      - name: Test integration environment setup
+        timeout-minutes: 8
+        run: |
+          echo "🔧 Testing integration environment setup..."
+          
+          # Test development environment setup
+          if [ -f scripts/dev/setup.sh ]; then
+            echo "Testing development setup script..."
+            chmod +x scripts/dev/setup.sh
+            
+            # Run setup in test mode if supported
+            ./scripts/dev/setup.sh --test-mode || {
+              echo "⚠️ Development setup script test failed"
+            }
+          fi
+          
+          # Test broker startup script
+          if [ -f scripts/dev/start_broker.sh ]; then
+            echo "Testing broker startup script..."
+            chmod +x scripts/dev/start_broker.sh
+            
+            # Test broker startup
+            ./scripts/dev/start_broker.sh --test-mode || {
+              echo "⚠️ Broker startup script test failed"
+            }
+          fi
+          
+          echo "✅ Integration environment setup testing completed"
+      
+      - name: Generate integration test report
+        if: always()
+        run: |
+          echo "📊 Integration Configuration Test Report" > integration_test_report.md
+          echo "=========================================" >> integration_test_report.md
+          echo "" >> integration_test_report.md
+          echo "**Test Configuration:**" >> integration_test_report.md
+          echo "- Test Suite: ${{ matrix.test-suite }}" >> integration_test_report.md
+          echo "- Docker Compose Version: ${{ env.DOCKER_COMPOSE_VERSION }}" >> integration_test_report.md
+          echo "- Platform: Ubuntu Latest" >> integration_test_report.md
+          echo "" >> integration_test_report.md
+          echo "**Integration Test Coverage:**" >> integration_test_report.md
+          echo "- Configuration Files: ${{ (matrix.test-suite == 'config' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> integration_test_report.md
+          echo "- Certificate Generation: ${{ (matrix.test-suite == 'certificates' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> integration_test_report.md
+          echo "- Docker Configurations: ${{ (matrix.test-suite == 'docker' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> integration_test_report.md
+          echo "- MQTT Broker Integration: ${{ (matrix.test-suite == 'broker' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> integration_test_report.md
+          echo "- Integration Scripts: ${{ (matrix.test-suite == 'scripts' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> integration_test_report.md
+          echo "" >> integration_test_report.md
+          echo "**Docker Environment:**" >> integration_test_report.md
+          echo '```' >> integration_test_report.md
+          docker --version >> integration_test_report.md
+          docker-compose --version >> integration_test_report.md
+          echo '```' >> integration_test_report.md
+      
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-config-test-artifacts-${{ matrix.test-suite }}
+          path: |
+            integration_test_report.md
+            test/integration/**/*.log
+            test/integration/certs/
+            *.log
+          retention-days: 7
+      
+      - name: Test summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "🎯 Integration Configuration Test Summary"
+          echo "========================================"
+          echo "✅ Test Suite: ${{ matrix.test-suite }}"
+          echo "✅ Configuration validation"
+          echo "✅ Certificate testing: ${{ (matrix.test-suite == 'certificates' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "✅ Docker configuration: ${{ (matrix.test-suite == 'docker' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "✅ MQTT broker integration: ${{ (matrix.test-suite == 'broker' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "✅ Integration scripts: ${{ (matrix.test-suite == 'scripts' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "========================================"

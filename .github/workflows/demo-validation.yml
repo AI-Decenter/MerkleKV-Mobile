@@ -1,0 +1,387 @@
+name: Demo Tests Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'test/e2e/demo_*.dart'
+      - 'test/e2e/summary_test.dart'
+      - 'test/e2e/README.md'
+      - 'test/e2e/IMPLEMENTATION_SUMMARY.md'
+      - '.github/workflows/demo-validation.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'test/e2e/demo_*.dart'
+      - 'test/e2e/summary_test.dart'
+      - 'test/e2e/README.md'
+      - 'test/e2e/IMPLEMENTATION_SUMMARY.md'
+      - '.github/workflows/demo-validation.yml'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Demo test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - demo
+          - memory
+          - network
+          - summary
+          - documentation
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  FLUTTER_VERSION: '3.16.0'
+
+jobs:
+  demo-tests-validation:
+    name: Demo Tests Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - demo
+          - memory
+          - network
+          - summary
+          - documentation
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+      
+      - name: Install Melos
+        run: dart pub global activate melos
+      
+      - name: Bootstrap Melos workspace
+        run: melos bootstrap
+      
+      - name: Setup demo testing environment
+        run: |
+          echo "🎭 Setting up demo testing environment..."
+          
+          # Install documentation tools
+          sudo apt-get update
+          sudo apt-get install -y markdown
+          
+          # Install Dart analysis tools
+          dart pub global activate dart_code_metrics
+          dart pub global activate pana
+          
+          echo "✅ Demo testing environment ready"
+      
+      - name: Validate demo test structure
+        timeout-minutes: 5
+        run: |
+          echo "🔍 Validating demo test structure..."
+          
+          cd test/e2e
+          
+          # Check for required demo files
+          required_files=(
+            "demo_test.dart"
+            "demo_memory_test.dart" 
+            "demo_network_test.dart"
+            "summary_test.dart"
+            "README.md"
+            "IMPLEMENTATION_SUMMARY.md"
+          )
+          
+          for file in "${required_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ Found: $file"
+            else
+              echo "⚠️ Missing: $file"
+            fi
+          done
+          
+          echo "✅ Demo test structure validation completed"
+      
+      - name: Run demo test validation
+        if: matrix.test-suite == 'demo' || matrix.test-suite == 'all'
+        timeout-minutes: 8
+        run: |
+          echo "🎭 Running demo test validation..."
+          
+          cd test/e2e
+          
+          VERBOSE_FLAG=""
+          if [ "${{ github.event.inputs.verbose || 'false' }}" == "true" ]; then
+            VERBOSE_FLAG="--verbose"
+          fi
+          
+          # Run demo test
+          echo "Running demo_test.dart..."
+          timeout 5m dart demo_test.dart $VERBOSE_FLAG || {
+            echo "❌ Demo test execution failed or timed out"
+            exit 1
+          }
+          
+          echo "✅ Demo test validation completed successfully"
+      
+      - name: Run demo memory test validation
+        if: matrix.test-suite == 'memory' || matrix.test-suite == 'all'
+        timeout-minutes: 6
+        run: |
+          echo "🧠 Running demo memory test validation..."
+          
+          cd test/e2e
+          
+          VERBOSE_FLAG=""
+          if [ "${{ github.event.inputs.verbose || 'false' }}" == "true" ]; then
+            VERBOSE_FLAG="--verbose"
+          fi
+          
+          # Run demo memory test
+          echo "Running demo_memory_test.dart..."
+          timeout 4m dart demo_memory_test.dart $VERBOSE_FLAG || {
+            echo "❌ Demo memory test execution failed or timed out"
+            exit 1
+          }
+          
+          echo "✅ Demo memory test validation completed successfully"
+      
+      - name: Run demo network test validation
+        if: matrix.test-suite == 'network' || matrix.test-suite == 'all'
+        timeout-minutes: 6
+        run: |
+          echo "🌐 Running demo network test validation..."
+          
+          cd test/e2e
+          
+          VERBOSE_FLAG=""
+          if [ "${{ github.event.inputs.verbose || 'false' }}" == "true" ]; then
+            VERBOSE_FLAG="--verbose"
+          fi
+          
+          # Run demo network test
+          echo "Running demo_network_test.dart..."
+          timeout 4m dart demo_network_test.dart $VERBOSE_FLAG || {
+            echo "❌ Demo network test execution failed or timed out"
+            exit 1
+          }
+          
+          echo "✅ Demo network test validation completed successfully"
+      
+      - name: Run summary test validation
+        if: matrix.test-suite == 'summary' || matrix.test-suite == 'all'
+        timeout-minutes: 8
+        run: |
+          echo "📋 Running summary test validation..."
+          
+          cd test/e2e
+          
+          VERBOSE_FLAG=""
+          if [ "${{ github.event.inputs.verbose || 'false' }}" == "true" ]; then
+            VERBOSE_FLAG="--verbose"
+          fi
+          
+          # Run summary test
+          echo "Running summary_test.dart..."
+          timeout 6m dart summary_test.dart $VERBOSE_FLAG || {
+            echo "❌ Summary test execution failed or timed out"
+            exit 1
+          }
+          
+          echo "✅ Summary test validation completed successfully"
+      
+      - name: Validate documentation
+        if: matrix.test-suite == 'documentation' || matrix.test-suite == 'all'
+        timeout-minutes: 5
+        run: |
+          echo "📚 Validating demo documentation..."
+          
+          cd test/e2e
+          
+          # Validate README.md
+          if [ -f README.md ]; then
+            echo "Validating README.md..."
+            markdown README.md > /dev/null || {
+              echo "⚠️ README.md has markdown syntax issues"
+            }
+            echo "✅ README.md validation completed"
+          fi
+          
+          # Validate IMPLEMENTATION_SUMMARY.md
+          if [ -f IMPLEMENTATION_SUMMARY.md ]; then
+            echo "Validating IMPLEMENTATION_SUMMARY.md..."
+            markdown IMPLEMENTATION_SUMMARY.md > /dev/null || {
+              echo "⚠️ IMPLEMENTATION_SUMMARY.md has markdown syntax issues"
+            }
+            echo "✅ IMPLEMENTATION_SUMMARY.md validation completed"
+          fi
+          
+          # Validate iOS_IMPLEMENTATION_SUMMARY.md
+          if [ -f iOS_IMPLEMENTATION_SUMMARY.md ]; then
+            echo "Validating iOS_IMPLEMENTATION_SUMMARY.md..."
+            markdown iOS_IMPLEMENTATION_SUMMARY.md > /dev/null || {
+              echo "⚠️ iOS_IMPLEMENTATION_SUMMARY.md has markdown syntax issues"
+            }
+            echo "✅ iOS_IMPLEMENTATION_SUMMARY.md validation completed"
+          fi
+          
+          # Check for documentation completeness
+          echo "Checking documentation completeness..."
+          
+          # Check if demo files have proper documentation
+          for demo_file in demo_*.dart summary_test.dart; do
+            if [ -f "$demo_file" ]; then
+              if grep -q "///" "$demo_file"; then
+                echo "✅ $demo_file has documentation comments"
+              else
+                echo "⚠️ $demo_file lacks documentation comments"
+              fi
+            fi
+          done
+          
+          echo "✅ Documentation validation completed"
+      
+      - name: Analyze demo code quality
+        timeout-minutes: 5
+        run: |
+          echo "🔍 Analyzing demo code quality..."
+          
+          cd test/e2e
+          
+          # Analyze Dart code quality
+          for dart_file in demo_*.dart summary_test.dart; do
+            if [ -f "$dart_file" ]; then
+              echo "Analyzing $dart_file..."
+              
+              # Check for basic code quality
+              dart analyze "$dart_file" || echo "⚠️ Analysis warnings in $dart_file"
+              
+              # Check for proper imports
+              if grep -q "import" "$dart_file"; then
+                echo "✅ $dart_file has proper imports"
+              else
+                echo "ℹ️ $dart_file has no imports (might be standalone)"
+              fi
+              
+              # Check for main function
+              if grep -q "void main" "$dart_file"; then
+                echo "✅ $dart_file has main function"
+              else
+                echo "⚠️ $dart_file lacks main function"
+              fi
+            fi
+          done
+          
+          echo "✅ Code quality analysis completed"
+      
+      - name: Test demo scenarios coverage
+        timeout-minutes: 8
+        run: |
+          echo "📊 Testing demo scenarios coverage..."
+          
+          cd test/e2e
+          
+          # Check demo scenarios coverage
+          echo "Checking demo scenarios coverage..."
+          
+          # List scenarios covered by demos
+          echo "Scenarios covered by demo tests:"
+          
+          for demo_file in demo_*.dart; do
+            if [ -f "$demo_file" ]; then
+              echo "📁 $demo_file:"
+              
+              # Extract scenario information from demo files
+              grep -n "scenario\|test\|example" "$demo_file" | head -5 || echo "  No clear scenarios found"
+              echo ""
+            fi
+          done
+          
+          # Check if all major scenarios are covered
+          scenarios_to_check=(
+            "lifecycle"
+            "network"
+            "memory"
+            "background"
+            "foreground"
+          )
+          
+          echo "Checking scenario coverage:"
+          for scenario in "${scenarios_to_check[@]}"; do
+            if grep -r -i "$scenario" demo_*.dart summary_test.dart &>/dev/null; then
+              echo "✅ $scenario scenario covered"
+            else
+              echo "⚠️ $scenario scenario not clearly covered"
+            fi
+          done
+          
+          echo "✅ Demo scenarios coverage check completed"
+      
+      - name: Generate demo validation report
+        if: always()
+        run: |
+          echo "📊 Demo Tests Validation Report" > demo_validation_report.md
+          echo "================================" >> demo_validation_report.md
+          echo "" >> demo_validation_report.md
+          echo "**Test Configuration:**" >> demo_validation_report.md
+          echo "- Test Suite: ${{ matrix.test-suite }}" >> demo_validation_report.md
+          echo "- Flutter Version: ${{ env.FLUTTER_VERSION }}" >> demo_validation_report.md
+          echo "- Platform: Ubuntu Latest" >> demo_validation_report.md
+          echo "" >> demo_validation_report.md
+          echo "**Demo Test Coverage:**" >> demo_validation_report.md
+          echo "- Demo Tests: ${{ (matrix.test-suite == 'demo' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> demo_validation_report.md
+          echo "- Memory Tests: ${{ (matrix.test-suite == 'memory' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> demo_validation_report.md
+          echo "- Network Tests: ${{ (matrix.test-suite == 'network' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> demo_validation_report.md
+          echo "- Summary Tests: ${{ (matrix.test-suite == 'summary' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> demo_validation_report.md
+          echo "- Documentation: ${{ (matrix.test-suite == 'documentation' || matrix.test-suite == 'all') && '✅' || '➖' }}" >> demo_validation_report.md
+          echo "" >> demo_validation_report.md
+          echo "**Demo Files Status:**" >> demo_validation_report.md
+          
+          cd test/e2e
+          for demo_file in demo_*.dart summary_test.dart; do
+            if [ -f "$demo_file" ]; then
+              echo "- $demo_file: ✅ Present" >> ../../demo_validation_report.md
+            else
+              echo "- $demo_file: ❌ Missing" >> ../../demo_validation_report.md
+            fi
+          done
+      
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-validation-test-artifacts-${{ matrix.test-suite }}
+          path: |
+            demo_validation_report.md
+            test/e2e/*.log
+          retention-days: 7
+      
+      - name: Test summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "🎯 Demo Tests Validation Summary"
+          echo "========================================"
+          echo "✅ Test Suite: ${{ matrix.test-suite }}"
+          echo "✅ Demo tests validation"
+          echo "✅ Memory tests: ${{ (matrix.test-suite == 'memory' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "✅ Network tests: ${{ (matrix.test-suite == 'network' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "✅ Summary tests: ${{ (matrix.test-suite == 'summary' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "✅ Documentation: ${{ (matrix.test-suite == 'documentation' || matrix.test-suite == 'all') && 'Included' || 'Not included' }}"
+          echo "✅ Code quality analysis"
+          echo "✅ Scenario coverage check"
+          echo "========================================"

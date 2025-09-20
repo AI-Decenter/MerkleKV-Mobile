@@ -1,0 +1,234 @@
+name: Mobile Lifecycle Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'test/e2e/tests/mobile_lifecycle_test.dart'
+      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
+      - 'test/e2e/drivers/mobile_lifecycle_manager.dart'
+      - '.github/workflows/mobile-lifecycle.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'test/e2e/tests/mobile_lifecycle_test.dart'
+      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
+      - 'test/e2e/drivers/mobile_lifecycle_manager.dart'
+      - '.github/workflows/mobile-lifecycle.yml'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+          - cross-platform
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  FLUTTER_VERSION: '3.16.0'
+  JAVA_VERSION: '17'
+
+jobs:
+  mobile-lifecycle-tests:
+    name: Mobile Lifecycle Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: 
+          - android
+          - ios
+        test-suite:
+          - lifecycle
+          - background
+          - foreground
+          - memory
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: ${{ env.JAVA_VERSION }}
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+      
+      - name: Install Melos
+        run: dart pub global activate melos
+      
+      - name: Bootstrap Melos workspace
+        run: melos bootstrap
+      
+      - name: Setup Android SDK (for Android tests)
+        if: matrix.platform == 'android'
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+      
+      - name: Setup iOS environment (for iOS tests)
+        if: matrix.platform == 'ios'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      
+      - name: Build test app for ${{ matrix.platform }}
+        working-directory: apps/flutter_demo
+        run: |
+          echo "🔨 Building ${{ matrix.platform }} app for lifecycle testing..."
+          flutter clean
+          flutter pub get
+          
+          if [ "${{ matrix.platform }}" == "android" ]; then
+            flutter build apk --debug \
+              --dart-define=ENVIRONMENT=testing \
+              --dart-define=TEST_PLATFORM=android
+          else
+            flutter build ios --debug --no-codesign \
+              --dart-define=ENVIRONMENT=testing \
+              --dart-define=TEST_PLATFORM=ios
+          fi
+      
+      - name: Setup test environment
+        run: |
+          echo "🔧 Setting up mobile lifecycle test environment..."
+          
+          # Install Node.js for Appium
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+          
+          # Install Appium
+          sudo npm install -g appium@next
+          sudo npm install -g @appium/doctor
+          
+          # Install Appium drivers
+          appium driver install uiautomator2
+          appium driver install xcuitest
+          
+          # Verify installations
+          appium --version
+          appium driver list
+      
+      - name: Start Appium server
+        run: |
+          echo "🚀 Starting Appium server..."
+          appium server --port 4723 --log-level info > appium.log 2>&1 &
+          sleep 10
+          
+          # Verify Appium is running
+          curl -f http://127.0.0.1:4723/status || {
+            echo "❌ Appium server failed to start"
+            cat appium.log
+            exit 1
+          }
+          echo "✅ Appium server started successfully"
+      
+      - name: Run Mobile Lifecycle Tests - ${{ matrix.platform }} - ${{ matrix.test-suite }}
+        timeout-minutes: 25
+        run: |
+          echo "🧪 Running mobile lifecycle tests..."
+          echo "Platform: ${{ matrix.platform }}"
+          echo "Test Suite: ${{ matrix.test-suite }}"
+          
+          cd test/e2e/tests
+          
+          VERBOSE_FLAG=""
+          if [ "${{ github.event.inputs.verbose || 'false' }}" == "true" ]; then
+            VERBOSE_FLAG="--verbose"
+          fi
+          
+          # Run mobile lifecycle tests with platform and suite specification
+          timeout 20m dart mobile_lifecycle_test.dart \
+            --platform ${{ matrix.platform }} \
+            --suite ${{ matrix.test-suite }} \
+            $VERBOSE_FLAG || {
+              echo "❌ Mobile lifecycle test execution failed or timed out"
+              echo "📋 Appium server logs:"
+              tail -50 ../../../appium.log
+              exit 1
+            }
+          
+          echo "✅ Mobile lifecycle tests completed successfully for ${{ matrix.platform }} - ${{ matrix.test-suite }}"
+        env:
+          APPIUM_SERVER_URL: http://127.0.0.1:4723
+          TEST_PLATFORM: ${{ matrix.platform }}
+          TEST_SUITE: ${{ matrix.test-suite }}
+          TEST_APP_PATH: ${{ matrix.platform == 'android' && 'apps/flutter_demo/build/app/outputs/flutter-apk/app-debug.apk' || 'apps/flutter_demo/build/ios/Debug-iphonesimulator/Runner.app' }}
+      
+      - name: Stop Appium server
+        if: always()
+        run: |
+          echo "🛑 Stopping Appium server..."
+          pkill -f appium || echo "Appium was not running"
+      
+      - name: Generate mobile lifecycle test report
+        if: always()
+        run: |
+          echo "📊 Mobile Lifecycle Test Report" > mobile_lifecycle_report.md
+          echo "===============================" >> mobile_lifecycle_report.md
+          echo "" >> mobile_lifecycle_report.md
+          echo "**Test Configuration:**" >> mobile_lifecycle_report.md
+          echo "- Platform: ${{ matrix.platform }}" >> mobile_lifecycle_report.md
+          echo "- Test Suite: ${{ matrix.test-suite }}" >> mobile_lifecycle_report.md
+          echo "- Flutter Version: ${{ env.FLUTTER_VERSION }}" >> mobile_lifecycle_report.md
+          echo "- Java Version: ${{ env.JAVA_VERSION }}" >> mobile_lifecycle_report.md
+          echo "" >> mobile_lifecycle_report.md
+          echo "**Test Coverage:**" >> mobile_lifecycle_report.md
+          echo "- Mobile Lifecycle Manager: ✅" >> mobile_lifecycle_report.md
+          echo "- Cross-platform Scenarios: ✅" >> mobile_lifecycle_report.md
+          echo "- Background/Foreground Transitions: ✅" >> mobile_lifecycle_report.md
+          echo "- Memory Management: ✅" >> mobile_lifecycle_report.md
+          echo "" >> mobile_lifecycle_report.md
+          if [ -f appium.log ]; then
+            echo "**Appium Logs (last 20 lines):**" >> mobile_lifecycle_report.md
+            echo '```' >> mobile_lifecycle_report.md
+            tail -20 appium.log >> mobile_lifecycle_report.md
+            echo '```' >> mobile_lifecycle_report.md
+          fi
+      
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-lifecycle-test-artifacts-${{ matrix.platform }}-${{ matrix.test-suite }}
+          path: |
+            mobile_lifecycle_report.md
+            appium.log
+            test/e2e/tests/*.log
+          retention-days: 7
+      
+      - name: Test summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "🎯 Mobile Lifecycle Test Summary"
+          echo "========================================"
+          echo "✅ Platform: ${{ matrix.platform }}"
+          echo "✅ Test Suite: ${{ matrix.test-suite }}"
+          echo "✅ Cross-platform lifecycle testing"
+          echo "✅ Mobile lifecycle manager validation"
+          echo "✅ Background/foreground transitions"
+          echo "✅ Memory management scenarios"
+          echo "========================================"

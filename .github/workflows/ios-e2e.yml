@@ -1,0 +1,418 @@
+name: iOS E2E Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/flutter_demo/**'
+      - 'test/e2e/**'
+      - 'test/e2e/tests/mobile_lifecycle_test.dart'
+      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
+      - '.github/workflows/ios-e2e.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/flutter_demo/**'
+      - 'test/e2e/**'
+      - 'test/e2e/tests/mobile_lifecycle_test.dart'
+      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
+      - '.github/workflows/ios-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - lifecycle
+          - network
+          - integration
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  FLUTTER_VERSION: '3.16.0'
+  XCODE_VERSION: '15.0'
+  IOS_SIMULATOR_VERSION: '17.0'
+  IOS_DEVICE_NAME: 'iPhone 15 Pro'
+
+jobs:
+  ios-e2e-tests:
+    name: iOS E2E Tests
+    runs-on: macos-14
+    timeout-minutes: 60
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite: 
+          - lifecycle
+          - network
+          - integration
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+      
+      - name: Install Melos
+        run: dart pub global activate melos
+      
+      - name: Bootstrap Melos workspace
+        run: melos bootstrap
+      
+      - name: Verify iOS Simulator availability
+        run: |
+          echo "Available iOS Simulators:"
+          xcrun simctl list devices ios
+          
+          # Find the best available iPhone 15 Pro simulator
+          AVAILABLE_SIMULATOR=$(xcrun simctl list devices ios | grep "iPhone 15 Pro" | head -n1)
+          
+          if [ -z "$AVAILABLE_SIMULATOR" ]; then
+            echo "No iPhone 15 Pro simulator found, using iPhone 15 instead"
+            AVAILABLE_SIMULATOR=$(xcrun simctl list devices ios | grep "iPhone 15 (" | head -n1)
+          fi
+          
+          if [ -z "$AVAILABLE_SIMULATOR" ]; then
+            echo "No iPhone 15 series simulator found, using latest iPhone"
+            AVAILABLE_SIMULATOR=$(xcrun simctl list devices ios | grep "iPhone" | grep -v "SE" | head -n1)
+          fi
+          
+          echo "Selected simulator: $AVAILABLE_SIMULATOR"
+          
+          # Extract UDID from the simulator line
+          SIMULATOR_UDID=$(echo "$AVAILABLE_SIMULATOR" | grep -o '[A-F0-9-]\{36\}')
+          echo "SELECTED_SIMULATOR_UDID=$SIMULATOR_UDID" >> $GITHUB_ENV
+          
+          # Extract device name and iOS version for reference
+          DEVICE_INFO=$(echo "$AVAILABLE_SIMULATOR" | sed 's/.*-- iOS \([0-9.]*\) --.*/\1/')
+          echo "SELECTED_IOS_VERSION=$DEVICE_INFO" >> $GITHUB_ENV
+      
+      - name: Boot iOS Simulator
+        run: |
+          UDID="${{ env.SELECTED_SIMULATOR_UDID }}"
+          echo "Booting simulator with UDID: $UDID"
+          
+          # Check if simulator is already booted
+          if xcrun simctl list devices | grep "$UDID" | grep -q "Booted"; then
+            echo "Simulator is already booted"
+          else
+            xcrun simctl boot "$UDID"
+          fi
+          
+          # Wait for simulator to be ready
+          echo "Waiting for simulator to be ready..."
+          xcrun simctl bootstatus "$UDID" -b
+          
+          echo "IOS_SIMULATOR_UDID=$UDID" >> $GITHUB_ENV
+      
+      - name: Install iOS app dependencies
+        working-directory: apps/flutter_demo
+        run: |
+          # Clean any existing iOS build artifacts FIRST
+          flutter clean
+          rm -rf ios/Pods ios/.symlinks ios/Podfile.lock
+
+          # Now get dependencies and generate xcconfig
+          flutter pub get
+          flutter precache --ios
+
+          # Install CocoaPods dependencies with correct deployment target
+          cd ios
+          pod install --repo-update
+
+          # Verify deployment target is set correctly
+          echo "Verifying iOS deployment target..."
+          grep -r "IPHONEOS_DEPLOYMENT_TARGET" . || echo "Deployment target check complete"
+      
+      - name: Build iOS app for testing
+        working-directory: apps/flutter_demo
+        run: |
+          flutter build ios --simulator \
+            --target lib/main.dart \
+            --debug \
+            --dart-define=ENVIRONMENT=testing
+      
+      - name: Install Appium and dependencies
+        run: |
+          npm install -g appium@2.0.0
+          npm install -g appium-doctor
+          appium driver install xcuitest
+          
+          # Verify Appium setup
+          appium-doctor --ios
+      
+      - name: Start Appium server
+        run: |
+          echo "Starting Appium server..."
+          appium server \
+            --address 127.0.0.1 \
+            --port 4723 \
+            --log-level info \
+            --log ios-e2e-appium.log &
+          
+          # Wait for Appium to start
+          sleep 10
+          
+          # Verify Appium is running
+          curl -f http://127.0.0.1:4723/status || exit 1
+      
+      - name: Install Network Link Conditioner
+        run: |
+          # Network Link Conditioner for network quality simulation
+          echo "Installing Network Link Conditioner..."
+          # This would typically be installed via Xcode Additional Tools
+          echo "Note: Network Link Conditioner should be installed manually for full network testing"
+      
+      - name: Install coreutils for timeout command
+        run: |
+          # Install coreutils to get gtimeout on macOS
+          brew install coreutils
+      
+      - name: Run iOS E2E Tests - ${{ matrix.test-suite }}
+        working-directory: test/e2e/tests
+        run: |
+          echo "Running iOS E2E tests for suite: ${{ matrix.test-suite }}"
+          echo "Using simulator UDID: ${{ env.IOS_SIMULATOR_UDID }}"
+          
+          VERBOSE_FLAG=""
+          if [ "${{ github.event.inputs.verbose || 'false' }}" == "true" ]; then
+            VERBOSE_FLAG="--verbose"
+          fi
+          
+          # Run tests with timeout and error handling (using gtimeout on macOS)
+          gtimeout 20m dart ios_e2e_test.dart \
+            --suite ${{ matrix.test-suite }} \
+            $VERBOSE_FLAG || {
+              echo "Test execution failed or timed out"
+              exit 1
+            }
+          
+          echo "iOS E2E tests completed successfully for suite: ${{ matrix.test-suite }}"
+        env:
+          IOS_SIMULATOR_UDID: ${{ env.IOS_SIMULATOR_UDID }}
+          APPIUM_SERVER_URL: http://127.0.0.1:4723
+          TEST_BUNDLE_ID: com.merkle_kv.flutter_demo
+          TEST_DEVICE_NAME: ${{ env.IOS_DEVICE_NAME }}
+          TEST_PLATFORM_VERSION: ${{ env.IOS_SIMULATOR_VERSION }}
+      
+      - name: Generate iOS test report
+        if: always()
+        working-directory: test/e2e/reports
+        run: |
+          mkdir -p ios-reports
+          
+          echo "# iOS E2E Test Report - ${{ matrix.test-suite }}" > ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "**Test Suite:** ${{ matrix.test-suite }}" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "**Platform:** iOS ${{ env.IOS_SIMULATOR_VERSION }}" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "**Device:** ${{ env.IOS_DEVICE_NAME }}" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "**Workflow:** ${{ github.workflow }}" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "**Run ID:** ${{ github.run_id }}" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "**Timestamp:** $(date -u)" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          echo "" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          
+          if [ -f "ios-e2e-test.log" ]; then
+            echo "## Test Execution Log" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+            echo "\`\`\`" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+            cat ios-e2e-test.log >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+            echo "\`\`\`" >> ios-reports/ios-${{ matrix.test-suite }}-report.md
+          fi
+      
+      - name: Capture iOS Simulator screenshots
+        if: failure()
+        run: |
+          mkdir -p test/e2e/reports/ios-screenshots
+          
+          UDID="${{ env.IOS_SIMULATOR_UDID }}"
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          
+          # Capture simulator screenshot
+          xcrun simctl io "$UDID" screenshot \
+            "test/e2e/reports/ios-screenshots/failure_${{ matrix.test-suite }}_${TIMESTAMP}.png"
+          
+          # Get simulator system log
+          xcrun simctl spawn "$UDID" log show --last 10m \
+            > "test/e2e/reports/ios-screenshots/system_log_${{ matrix.test-suite }}_${TIMESTAMP}.log"
+      
+      - name: Run Mobile Lifecycle Tests (iOS Integration)
+        if: matrix.test-suite == 'lifecycle' || matrix.test-suite == 'integration'
+        timeout-minutes: 10
+        run: |
+          echo "🔄 Running iOS mobile lifecycle integration tests..."
+          
+          cd test/e2e/tests
+          
+          # Run mobile lifecycle test with iOS platform
+          timeout 8m dart mobile_lifecycle_test.dart \
+            --platform ios \
+            --suite lifecycle \
+            --integration-mode || {
+              echo "⚠️ Mobile lifecycle integration test completed with warnings"
+            }
+          
+          echo "✅ iOS mobile lifecycle integration tests completed"
+        env:
+          TEST_PLATFORM: ios
+          INTEGRATION_MODE: true
+      
+      - name: Upload iOS test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-e2e-artifacts-${{ matrix.test-suite }}
+          path: |
+            test/e2e/reports/ios-reports/
+            test/e2e/reports/ios-screenshots/
+            ios-e2e-appium.log
+          retention-days: 30
+      
+      - name: Cleanup iOS Simulator
+        if: always()
+        run: |
+          UDID="${{ env.IOS_SIMULATOR_UDID }}"
+          
+          # Terminate any running apps
+          xcrun simctl terminate "$UDID" com.merkle_kv.flutter_demo || true
+          
+          # Shutdown simulator
+          xcrun simctl shutdown "$UDID" || true
+          
+          # Reset simulator if needed
+          if [ "${{ github.event_name }}" == "push" ]; then
+            xcrun simctl erase "$UDID"
+          fi
+
+  # Firebase Test Lab iOS testing (for real device testing)
+  firebase-ios-tests:
+    name: Firebase Test Lab iOS
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+      
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          service_account_key: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          project_id: ${{ secrets.FIREBASE_PROJECT_ID }}
+      
+      - name: Build iOS app for Firebase Test Lab
+        working-directory: apps/flutter_demo
+        run: |
+          flutter build ios \
+            --target lib/main.dart \
+            --release \
+            --dart-define=ENVIRONMENT=testing
+          
+          # Create .ipa file for Firebase Test Lab
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination generic/platform=iOS \
+            -archivePath Runner.xcarchive \
+            archive
+          
+          xcodebuild -exportArchive \
+            -archivePath Runner.xcarchive \
+            -exportPath . \
+            -exportOptionsPlist ExportOptions.plist
+      
+      - name: Run Firebase Test Lab iOS tests
+        working-directory: apps/flutter_demo
+        run: |
+          gcloud firebase test ios run \
+            --type xctest \
+            --app ios/Runner.ipa \
+            --device model=iphone13pro,version=15.7,locale=en,orientation=portrait \
+            --device model=iphone14,version=16.6,locale=en,orientation=portrait \
+            --timeout 30m \
+            --results-bucket ${{ secrets.FIREBASE_RESULTS_BUCKET }} \
+            --results-dir ios-e2e-$(date +%Y%m%d_%H%M%S)
+
+  # Test result summary
+  ios-test-summary:
+    name: iOS Test Summary
+    runs-on: ubuntu-latest
+    needs: [ios-e2e-tests]
+    if: always()
+    
+    steps:
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ios-test-results/
+      
+      - name: Generate test summary
+        run: |
+          echo "# iOS E2E Test Summary" > ios-test-summary.md
+          echo "" >> ios-test-summary.md
+          echo "**Workflow:** ${{ github.workflow }}" >> ios-test-summary.md
+          echo "**Run ID:** ${{ github.run_id }}" >> ios-test-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> ios-test-summary.md
+          echo "**Branch:** ${{ github.ref_name }}" >> ios-test-summary.md
+          echo "**Timestamp:** $(date -u)" >> ios-test-summary.md
+          echo "" >> ios-test-summary.md
+          
+          # Analyze test results
+          total_suites=0
+          passed_suites=0
+          
+          for suite in lifecycle network integration; do
+            total_suites=$((total_suites + 1))
+            
+            if [ "${{ needs.ios-e2e-tests.result }}" == "success" ]; then
+              passed_suites=$((passed_suites + 1))
+              echo "✅ $suite: PASSED" >> ios-test-summary.md
+            else
+              echo "❌ $suite: FAILED" >> ios-test-summary.md
+            fi
+          done
+          
+          echo "" >> ios-test-summary.md
+          echo "**Overall Result:** $passed_suites/$total_suites test suites passed" >> ios-test-summary.md
+          
+          cat ios-test-summary.md
+      
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('ios-test-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

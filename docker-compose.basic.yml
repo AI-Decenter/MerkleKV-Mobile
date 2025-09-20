@@ -6,19 +6,20 @@ services:
     ports:
       - "1883:1883"    # MQTT
     volumes:
-      - ./test/integration/config/mosquitto/mosquitto-basic.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto_test_data:/mosquitto/data
       - mosquitto_test_log:/mosquitto/log
     environment:
       - TZ=UTC
     networks:
       - integration_test_network
+    # Use default configuration (allows anonymous access)
+    command: mosquitto -c /mosquitto-no-auth.conf
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 | grep -q '[0-9]'"]
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/broker/uptime' -C 1 | grep -q '[0-9]' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 5s
+      start_period: 10s
 
   # Network proxy for simulating network partitions
   toxiproxy:
