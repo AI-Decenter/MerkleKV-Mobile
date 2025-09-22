@@ -1,16 +1,10 @@
 name: Android Testing (Widget Tests)
 
-on: 
+on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'apps/flutter_demo/**'
-      - '.github/workflows/android-testing.yml'
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'apps/flutter_demo/**'
-      - '.github/workflows/android-testing.yml'
+    branches: [ main, develop ]
 
 jobs:
   widget-tests:

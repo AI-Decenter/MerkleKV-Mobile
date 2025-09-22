@@ -3,16 +3,8 @@ name: Network State Testing
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'test/e2e/network/**'
-      - 'test/e2e/drivers/network_state_manager.dart'
-      - '.github/workflows/network-testing.yml'
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'test/e2e/network/**'
-      - 'test/e2e/drivers/network_state_manager.dart'
-      - '.github/workflows/network-testing.yml'
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       test_suite:

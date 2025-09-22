@@ -3,20 +3,8 @@ name: iOS E2E Testing
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'apps/flutter_demo/**'
-      - 'test/e2e/**'
-      - 'test/e2e/tests/mobile_lifecycle_test.dart'
-      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
-      - '.github/workflows/ios-e2e.yml'
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'apps/flutter_demo/**'
-      - 'test/e2e/**'
-      - 'test/e2e/tests/mobile_lifecycle_test.dart'
-      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
-      - '.github/workflows/ios-e2e.yml'
   workflow_dispatch:
     inputs:
       test_suite:

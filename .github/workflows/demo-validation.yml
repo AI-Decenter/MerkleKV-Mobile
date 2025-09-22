@@ -3,20 +3,8 @@ name: Demo Tests Validation
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'test/e2e/demo_*.dart'
-      - 'test/e2e/summary_test.dart'
-      - 'test/e2e/README.md'
-      - 'test/e2e/IMPLEMENTATION_SUMMARY.md'
-      - '.github/workflows/demo-validation.yml'
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'test/e2e/demo_*.dart'
-      - 'test/e2e/summary_test.dart'
-      - 'test/e2e/README.md'
-      - 'test/e2e/IMPLEMENTATION_SUMMARY.md'
-      - '.github/workflows/demo-validation.yml'
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       test_suite:

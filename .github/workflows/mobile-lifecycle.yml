@@ -3,18 +3,8 @@ name: Mobile Lifecycle Testing
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'test/e2e/tests/mobile_lifecycle_test.dart'
-      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
-      - 'test/e2e/drivers/mobile_lifecycle_manager.dart'
-      - '.github/workflows/mobile-lifecycle.yml'
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'test/e2e/tests/mobile_lifecycle_test.dart'
-      - 'test/e2e/scenarios/mobile_lifecycle_scenarios.dart'
-      - 'test/e2e/drivers/mobile_lifecycle_manager.dart'
-      - '.github/workflows/mobile-lifecycle.yml'
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       test_suite:

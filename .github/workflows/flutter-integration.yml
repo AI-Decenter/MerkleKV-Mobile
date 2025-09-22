@@ -3,16 +3,8 @@ name: Flutter Integration Testing
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'test/e2e/flutter/**'
-      - 'apps/flutter_demo/integration_test/**'
-      - '.github/workflows/flutter-integration.yml'
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'test/e2e/flutter/**'
-      - 'apps/flutter_demo/integration_test/**'
-      - '.github/workflows/flutter-integration.yml'
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       test_suite:

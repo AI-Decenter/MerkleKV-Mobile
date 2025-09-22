@@ -3,18 +3,8 @@ name: Integration Configuration Testing
 on:
   push:
     branches: [ main, develop ]
-    paths:
-      - 'test/integration/**'
-      - '.ci/**'
-      - 'docker-compose*.yml'
-      - '.github/workflows/integration-config.yml'
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'test/integration/**'
-      - '.ci/**'
-      - 'docker-compose*.yml'
-      - '.github/workflows/integration-config.yml'
+    branches: [ main, develop ]
   workflow_dispatch:
     inputs:
       test_suite:
