@@ -1,21 +1,25 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:convert';
 
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 
 import '../config/merkle_kv_config.dart';
+import '../battery/battery_monitor.dart';
+import '../battery/battery_aware_reconnect_policy.dart';
 import 'connection_state.dart';
 import 'mqtt_client_interface.dart';
 
 /// Default implementation of [MqttClientInterface] using mqtt_client package.
 ///
 /// Provides connection management with exponential backoff, session handling,
-/// Last Will and Testament, and QoS enforcement per Locked Spec §6.
+/// Last Will and Testament, QoS enforcement per Locked Spec §6, and battery-aware
+/// reconnection policies for mobile power management.
 class MqttClientImpl implements MqttClientInterface {
   final MerkleKVConfig _config;
+  final BatteryMonitor _batteryMonitor;
+  final BatteryAwareReconnectPolicy _reconnectPolicy;
   late final MqttServerClient _client;
   final StreamController<ConnectionState> _connectionStateController =
       StreamController<ConnectionState>.broadcast();
@@ -27,13 +31,28 @@ class MqttClientImpl implements MqttClientInterface {
   int _reconnectAttempts = 0;
 
   /// Creates an MQTT client implementation with the provided configuration.
-  MqttClientImpl(this._config) {
+  ///
+  /// [batteryMonitor] - Optional battery monitor for power-aware reconnection.
+  /// [reconnectPolicy] - Optional custom reconnection policy.
+  MqttClientImpl(
+    this._config, {
+    BatteryMonitor? batteryMonitor,
+    BatteryAwareReconnectPolicy? reconnectPolicy,
+  })  : _batteryMonitor = batteryMonitor ?? DefaultBatteryMonitor(),
+        _reconnectPolicy = reconnectPolicy ?? const BatteryAwareReconnectPolicy() {
     _initializeClient();
+    _startBatteryMonitoring();
   }
 
   @override
   Stream<ConnectionState> get connectionState =>
       _connectionStateController.stream;
+
+  /// Current battery monitor instance.
+  BatteryMonitor get batteryMonitor => _batteryMonitor;
+
+  /// Current battery-aware reconnection policy.
+  BatteryAwareReconnectPolicy get reconnectPolicy => _reconnectPolicy;
 
   /// Initialize the MQTT client with configuration settings.
   void _initializeClient() {
@@ -173,21 +192,34 @@ class MqttClientImpl implements MqttClientInterface {
     }
   }
 
-  /// Schedule reconnection with exponential backoff and jitter.
+  /// Initialize battery monitoring for power-aware reconnection.
+  void _startBatteryMonitoring() {
+    _batteryMonitor.start().catchError((error) {
+      // Battery monitoring failure should not prevent MQTT client operation
+      // Log the error but continue with default battery state
+    });
+  }
+
+  /// Schedule reconnection with battery-aware exponential backoff and jitter.
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
 
-    // Exponential backoff: 1s → 2s → 4s → ... → 32s (max)
-    final baseDelay = math.min(math.pow(2, _reconnectAttempts).toInt(), 32);
+    // Get current battery state for gating decision
+    final batteryState = _batteryMonitor.currentState;
 
-    // Add jitter ±20%
-    final random = math.Random();
-    final jitter = 1.0 + (random.nextDouble() - 0.5) * 0.4; // ±20%
-    final delaySeconds = (baseDelay * jitter).round();
+    // Check if we should gate this reconnection attempt
+    if (!_reconnectPolicy.shouldAttemptReconnection(batteryState, _reconnectAttempts)) {
+      // Skip this reconnection attempt due to battery constraints
+      // Note: We don't increment _reconnectAttempts here as we're not actually attempting
+      return;
+    }
 
+    // Calculate backoff delay using Locked Spec timing (battery has no effect on timing)
+    final backoffDuration = _reconnectPolicy.calculateBackoff(_reconnectAttempts);
+    
     _reconnectAttempts++;
 
-    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
+    _reconnectTimer = Timer(backoffDuration, () async {
       if (_currentState == ConnectionState.disconnected) {
         try {
           await connect();
@@ -348,6 +380,7 @@ class MqttClientImpl implements MqttClientInterface {
   /// Dispose resources.
   Future<void> dispose() async {
     _reconnectTimer?.cancel();
+    await _batteryMonitor.stop();
     if (!_connectionStateController.isClosed) {
       await _connectionStateController.close();
     }

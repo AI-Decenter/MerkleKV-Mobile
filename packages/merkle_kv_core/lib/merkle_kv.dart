@@ -35,3 +35,8 @@ export 'src/config/default_config.dart';
 
 // Export connection state for reactive monitoring
 export 'src/mqtt/connection_state.dart';
+
+// Export battery management for mobile power optimization
+export 'src/battery/battery_state.dart';
+export 'src/battery/battery_monitor.dart';
+export 'src/battery/battery_aware_reconnect_policy.dart';

@@ -25,6 +25,11 @@ export 'src/mqtt/connection_lifecycle.dart';
 export 'src/mqtt/connection_logger.dart';
 export 'src/mqtt/topic_validator.dart';
 
+// Battery Management
+export 'src/battery/battery_state.dart';
+export 'src/battery/battery_monitor.dart';
+export 'src/battery/battery_aware_reconnect_policy.dart';
+
 // Commands and Correlation
 export 'src/commands/command.dart';
 export 'src/commands/response.dart';
