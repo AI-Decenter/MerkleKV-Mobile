@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:test/test.dart';
 import 'package:merkle_kv_core/merkle_kv_core.dart';
+import 'package:merkle_kv_core/src/mqtt/topic_authorization.dart';
 
 import 'test_config.dart';
 import '../utils/test_broker_helper.dart';
@@ -73,10 +74,11 @@ void main() {
     });
 
     test('Topic routing functionality', () async {
-      final config = TestConfigurations.mosquittoBasic(
+      final baseConfig = TestConfigurations.mosquittoBasic(
         clientId: clientId,
         nodeId: nodeId,
       );
+      final config = baseConfig.copyWith(replicationCanPublishEvents: true);
 
       final mqttClient = MqttClientImpl(config);
       final topicRouter = TopicRouterImpl(config, mqttClient);
@@ -86,9 +88,17 @@ void main() {
 
         // Test topic router can publish to different topics
         await topicRouter.publishCommand(
-            'target-client', '{"test": "command"}');
+            config.clientId, '{"test": "command"}');
         await topicRouter.publishResponse('{"test": "response"}');
         await topicRouter.publishReplication('{"test": "replication"}');
+
+        await expectLater(
+          topicRouter.publishCommand(
+            'target-client',
+            '{"test": "unauthorized"}',
+          ),
+          throwsA(isA<AuthorizationException>()),
+        );
 
         await mqttClient.disconnect();
       } finally {
