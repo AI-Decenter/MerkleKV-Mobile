@@ -126,6 +126,7 @@ void main() {
         clientId: 'test-client',
         nodeId: 'test-node',
         topicPrefix: 'test/prefix',
+        replicationCanPublishEvents: true,
       );
       mockClient = MockMqttClient();
       router = TopicRouterImpl(config, mockClient);
@@ -199,6 +200,7 @@ void main() {
           clientId: 'device-2',
           nodeId: 'node-2',
           topicPrefix: 'test/prefix',
+          replicationCanPublishEvents: true,
         );
         final mockClient2 = MockMqttClient();
         final router2 = TopicRouterImpl(config2, mockClient2);

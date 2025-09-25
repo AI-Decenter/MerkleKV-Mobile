@@ -17,6 +17,7 @@ void main() {
         nodeId: 'test-node',
         topicPrefix: 'test/prefix',
       );
+      config = config.copyWith(replicationCanPublishEvents: true);
       mockClient = MockMqttClient();
       router = TopicRouterImpl(config, mockClient);
     });

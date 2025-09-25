@@ -84,10 +84,17 @@ class TopicAuthorization {
     final prefix = config.topicPrefix;
     final clientId = config.clientId;
 
-    if ((topicFilter.contains('+') || topicFilter.contains('#')) && (topicFilter.contains('/cmd') || topicFilter.contains('/res'))) {
-      TopicAuthorizationMetrics.failures++;
-      TopicAuthorizationMetrics.wildcardDenied++;
-      throw const AuthorizationException('Subscribe denied: wildcard access to canonical command/response topics is not allowed');
+    final hasWildcard = topicFilter.contains('+') || topicFilter.contains('#');
+    if (hasWildcard) {
+      final targetsCanonicalTopics =
+          topicFilter.contains('/cmd') || topicFilter.contains('/res');
+  final targetsCanonicalNamespace = topicFilter.startsWith('$prefix/');
+
+      if (targetsCanonicalTopics || targetsCanonicalNamespace) {
+        TopicAuthorizationMetrics.failures++;
+        TopicAuthorizationMetrics.wildcardDenied++;
+        throw const AuthorizationException('Subscribe denied: wildcard access to canonical command/response topics is not allowed');
+      }
     }
 
     final resPattern = RegExp('^${RegExp.escape(prefix)}/([^/]+)/res\$');
