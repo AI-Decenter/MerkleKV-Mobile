@@ -48,6 +48,7 @@ abstract class TopicRouter {
 /// Provides topic management with validation, QoS enforcement, and automatic
 /// re-subscription after reconnection events.
 class TopicRouterImpl implements TopicRouter {
+  final MerkleKVConfig _config;
   final MqttClientInterface _mqttClient;
   final TopicScheme _topicScheme;
 
@@ -60,7 +61,8 @@ class TopicRouterImpl implements TopicRouter {
 
   /// Creates a TopicRouter with the provided configuration and MQTT client.
   TopicRouterImpl(MerkleKVConfig config, this._mqttClient)
-    : _topicScheme = TopicScheme.create(config.topicPrefix, config.clientId) {
+    : _config = config,
+      _topicScheme = TopicScheme.create(config.topicPrefix, config.clientId) {
     _initializeConnectionMonitoring();
   }
 
@@ -83,6 +85,10 @@ class TopicRouterImpl implements TopicRouter {
 
     // Re-subscribe to commands if handler is active
     if (_commandHandler != null) {
+      TopicAuthorization.checkSubscribe(
+        _config,
+        _topicScheme.commandTopic,
+      );
       await _mqttClient.subscribe(_topicScheme.commandTopic, _commandHandler!);
       developer.log(
         'Restored command subscription: ${_topicScheme.commandTopic}',
@@ -93,6 +99,10 @@ class TopicRouterImpl implements TopicRouter {
 
     // Re-subscribe to replication if handler is active
     if (_replicationHandler != null) {
+      TopicAuthorization.checkSubscribe(
+        _config,
+        _topicScheme.replicationTopic,
+      );
       await _mqttClient.subscribe(
         _topicScheme.replicationTopic,
         _replicationHandler!,
@@ -110,6 +120,10 @@ class TopicRouterImpl implements TopicRouter {
     void Function(String, String) handler,
   ) async {
     _commandHandler = handler;
+    TopicAuthorization.checkSubscribe(
+      _config,
+      _topicScheme.commandTopic,
+    );
     await _mqttClient.subscribe(_topicScheme.commandTopic, handler);
 
     developer.log(
@@ -124,6 +138,10 @@ class TopicRouterImpl implements TopicRouter {
     void Function(String, String) handler,
   ) async {
     _replicationHandler = handler;
+    TopicAuthorization.checkSubscribe(
+      _config,
+      _topicScheme.replicationTopic,
+    );
     await _mqttClient.subscribe(_topicScheme.replicationTopic, handler);
 
     developer.log(
@@ -141,25 +159,10 @@ class TopicRouterImpl implements TopicRouter {
       targetClientId,
     );
 
-    // Authorization (client can only publish to its own command topic). If
-    // targetClientId differs, underlying MQTT publish will be denied. We
-    // attempt pre-flight check here for clearer error semantics.
-    try {
-      TopicAuthorization.checkPublish(
-        // Reconstruct minimal config-like object via topic scheme values would require config;
-        // publish will still enforce. So rely on underlying check.
-        // (Left intentionally minimal to avoid circular dependency exposure.)
-        // No-op: we rely on mqtt_client_impl.
-        // ignore: unnecessary_statements
-        // This comment documents defense in depth.
-        // We still proceed to publish; underlying layer validates.
-        // (Future enhancement: expose config or pass through.)
-        //
-        // For now, skip direct call since we don't have full config.
-      );
-    } catch (e) {
-      if (e is AuthorizationException) rethrow;
-    }
+    TopicAuthorization.checkPublish(
+      _config,
+      targetTopic,
+    );
     await _mqttClient.publish(targetTopic, payload, forceQoS1: true, forceRetainFalse: true);
 
     developer.log(
@@ -171,6 +174,10 @@ class TopicRouterImpl implements TopicRouter {
 
   @override
   Future<void> publishResponse(String payload) async {
+    TopicAuthorization.checkPublish(
+      _config,
+      _topicScheme.responseTopic,
+    );
     await _mqttClient.publish(_topicScheme.responseTopic, payload, forceQoS1: true, forceRetainFalse: true);
 
     developer.log(
@@ -182,6 +189,10 @@ class TopicRouterImpl implements TopicRouter {
 
   @override
   Future<void> publishReplication(String payload) async {
+    TopicAuthorization.checkPublish(
+      _config,
+      _topicScheme.replicationTopic,
+    );
     await _mqttClient.publish(_topicScheme.replicationTopic, payload, forceQoS1: true, forceRetainFalse: true);
 
     developer.log(

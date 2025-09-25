@@ -5,6 +5,7 @@ import 'package:merkle_kv_core/src/config/invalid_config_exception.dart';
 import 'package:merkle_kv_core/src/mqtt/connection_state.dart';
 import 'package:merkle_kv_core/src/mqtt/mqtt_client_interface.dart';
 import 'package:merkle_kv_core/src/mqtt/topic_router.dart';
+import 'package:merkle_kv_core/src/mqtt/topic_authorization.dart';
 
 /// Mock MQTT client for testing
 class MockMqttClient implements MqttClientInterface {
@@ -230,17 +231,28 @@ void main() {
 
     group('publishing with QoS enforcement', () {
       test(
-        'publishCommand publishes to correct target topic with QoS=1, retain=false',
+        'publishCommand publishes to own canonical topic with QoS=1, retain=false',
         () async {
-          await router.publishCommand('target-device', 'command-payload');
+          await router.publishCommand('test-client', 'command-payload');
 
           expect(mockClient.publishCalls, hasLength(1));
           final call = mockClient.publishCalls.first;
 
-          expect(call.topic, equals('test/prefix/target-device/cmd'));
+          expect(call.topic, equals('test/prefix/test-client/cmd'));
           expect(call.payload, equals('command-payload'));
           expect(call.qos1, isTrue);
           expect(call.retainFalse, isTrue);
+        },
+      );
+
+      test(
+        'publishCommand denies cross-client target even with QoS enforcement',
+        () async {
+          expect(
+            () => router.publishCommand('target-device', 'command-payload'),
+            throwsA(isA<AuthorizationException>()),
+          );
+          expect(mockClient.publishCalls, isEmpty);
         },
       );
 
@@ -307,14 +319,17 @@ void main() {
         );
       });
 
-      test('publishCommand accepts valid target clientId', () async {
-        await router.publishCommand('valid-client-123', 'payload');
+      test('publishCommand accepts own clientId as valid target', () async {
+        await router.publishCommand('test-client', 'payload');
         expect(mockClient.publishCalls, hasLength(1));
+      });
 
-        // Test shorter clientId to avoid topic length limit
-        final validClientId = 'a' * 50; // Much shorter to fit within topic length limit
-        await router.publishCommand(validClientId, 'payload');
-        expect(mockClient.publishCalls, hasLength(2));
+      test('publishCommand denies different clientId despite valid format', () async {
+        expect(
+          () => router.publishCommand('valid-client-123', 'payload'),
+          throwsA(isA<AuthorizationException>()),
+        );
+        expect(mockClient.publishCalls, isEmpty);
       });
     });
 

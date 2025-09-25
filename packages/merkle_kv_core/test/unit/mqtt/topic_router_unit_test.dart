@@ -1,11 +1,7 @@
-import 'dart:convert';
 import 'package:test/test.dart';
 import '../../../lib/src/mqtt/topic_router.dart';
-import '../../../lib/src/mqtt/topic_validator.dart';
-import '../../../lib/src/mqtt/connection_state.dart';
+import '../../../lib/src/mqtt/topic_authorization.dart';
 import '../../../lib/src/config/merkle_kv_config.dart';
-import '../../../lib/src/config/invalid_config_exception.dart';
-import '../../utils/generators.dart';
 import '../../utils/mock_helpers.dart';
 
 void main() {
@@ -41,12 +37,20 @@ void main() {
         expect(router, isNotNull);
       });
 
-      test('can publish command messages', () async {
-        await router.publishCommand('target-device', 'test-command');
+      test('publishes command to own canonical topic', () async {
+        await router.publishCommand('test-client', 'test-command');
         expect(mockClient.publishCalls, hasLength(1));
         final call = mockClient.publishCalls.first;
-        expect(call.topic, contains('test/prefix'));
+        expect(call.topic, equals('test/prefix/test-client/cmd'));
         expect(call.payload, equals('test-command'));
+      });
+
+      test('rejects publishing command to another client', () async {
+        expect(
+          () => router.publishCommand('target-device', 'test-command'),
+          throwsA(isA<AuthorizationException>()),
+        );
+        expect(mockClient.publishCalls, isEmpty);
       });
 
       test('can publish response messages', () async {
@@ -82,26 +86,26 @@ void main() {
       test('handlers receive messages correctly', () async {
         String? receivedTopic;
         String? receivedPayload;
-        
+
         await router.subscribeToCommands((topic, payload) {
           receivedTopic = topic;
           receivedPayload = payload;
         });
-        
+
         mockClient.simulateMessage('test/prefix/test-client/cmd', 'test-command');
-        
+
         await Future.delayed(const Duration(milliseconds: 10));
-        
+
         expect(receivedTopic, equals('test/prefix/test-client/cmd'));
         expect(receivedPayload, equals('test-command'));
       });
 
       test('disposal works correctly', () async {
         await router.dispose();
-        
+
         // Operations after disposal should still work (disposal only cleans up subscriptions)
         expect(
-          () => router.publishCommand('target', 'payload'),
+          () => router.publishCommand('test-client', 'payload'),
           returnsNormally,
         );
       });

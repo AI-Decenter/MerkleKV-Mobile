@@ -26,10 +26,8 @@ class MerkleKVCommandClient {
     // Create correlator with topic router publish function
     final correlator = CommandCorrelator(
       publishCommand: (jsonPayload) async {
-        // For demo purposes, publish to a target device
-        // In practice, this would be determined by the command routing logic
-        const targetClientId = 'target-device';
-        await topicRouter.publishCommand(targetClientId, jsonPayload);
+        // Clients may only publish to their own canonical command topic.
+        await topicRouter.publishCommand(config.clientId, jsonPayload);
       },
       logger: (entry) {
         print('Command lifecycle: ${entry.toString()}');
