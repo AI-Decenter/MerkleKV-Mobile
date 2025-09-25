@@ -141,6 +141,38 @@ user replication-node-1
 topic readwrite merkle/replication/events
 ```
 
+### Canonical Topic Authorization (Client-Side)
+
+The SDK enforces topic-level authorization before performing MQTT operations:
+
+| Topic Type | Operation | Rule |
+|------------|-----------|------|
+| Command `{prefix}/{client_id}/cmd` | Publish | Only owning client may publish |
+| Response `{prefix}/{client_id}/res` | Subscribe | Only owning client may subscribe |
+| Replication `{prefix}/replication/events` | Publish / Subscribe | Governed by configuration flags |
+
+Wildcard subscriptions spanning canonical command/response namespaces (e.g. `+/cmd`, `#/res`) are denied to prevent cross-client enumeration.
+
+Configuration flags (`MerkleKVConfig`):
+
+```
+replicationCanPublishEvents: bool (default: false)
+replicationCanSubscribeEvents: bool (default: true)
+```
+
+On violation, an authorization error is thrown with a non-sensitive message (no disclosure of other client IDs).
+
+In-memory observability counters (`TopicAuthorizationMetrics`):
+
+- totalChecks
+- failures
+- commandFailures
+- responseFailures
+- replicationFailures
+- wildcardDenied
+
+These can be exported to an external metrics system in future releases.
+
 **Mobile Security**:
 
 - Store credentials securely using Keychain (iOS) or Keystore (Android)
