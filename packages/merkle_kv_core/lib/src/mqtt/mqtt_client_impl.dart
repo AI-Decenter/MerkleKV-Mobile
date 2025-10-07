@@ -184,19 +184,36 @@ class MqttClientImpl implements MqttClientInterface {
 
       // Handle authentication
       if (_config.username != null || _config.password != null) {
-        final user = _config.username ?? '';
-        final pass = _config.password ?? '';
-        _client.connect(user, pass).then((status) {
+        final user = _config.username;
+        final pass = _config.password;
+        final hasUser = user != null && user.isNotEmpty;
+        final hasPass = pass != null && pass.isNotEmpty;
+        if (hasUser || hasPass) {
+          _client.connect(user ?? '', pass ?? '').then((status) {
           timeoutTimer?.cancel();
           if (!connectionCompleter.isCompleted) {
             connectionCompleter.complete(status);
           }
-        }).catchError((error) {
+          }).catchError((error) {
           timeoutTimer?.cancel();
           if (!connectionCompleter.isCompleted) {
             connectionCompleter.completeError(error);
           }
-        });
+          });
+        } else {
+          // Both username and password are empty strings; attempt anonymous connect
+          _client.connect().then((status) {
+            timeoutTimer?.cancel();
+            if (!connectionCompleter.isCompleted) {
+              connectionCompleter.complete(status);
+            }
+          }).catchError((error) {
+            timeoutTimer?.cancel();
+            if (!connectionCompleter.isCompleted) {
+              connectionCompleter.completeError(error);
+            }
+          });
+        }
       } else {
         _client.connect().then((status) {
           timeoutTimer?.cancel();
