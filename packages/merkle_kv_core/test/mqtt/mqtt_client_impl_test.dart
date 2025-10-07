@@ -37,27 +37,22 @@ void main() {
         expect(client.connectionState, isA<Stream<ConnectionState>>());
       });
 
-      test('enforces TLS when credentials are present', () {
-        expect(
-          () => MqttClientImpl(
-            MerkleKVConfig(
-              mqttHost: 'localhost',
-              mqttPort: 1883,
-              clientId: 'test-client',
-              nodeId: 'test-node',
-              mqttUseTls: false,
-              username: 'user',
-              password: 'pass',
-            ),
-          ),
-          throwsA(
-            isA<ArgumentError>().having(
-              (e) => e.message,
-              'message',
-              contains('TLS must be enabled when credentials are provided'),
-            ),
+      test('allows credentials without TLS (warn-only)', () {
+        // Policy updated: credentials over non-TLS are allowed; client should construct normally.
+        client = MqttClientImpl(
+          MerkleKVConfig(
+            mqttHost: 'localhost',
+            mqttPort: 1883,
+            clientId: 'test-client',
+            nodeId: 'test-node',
+            mqttUseTls: false,
+            username: 'user',
+            password: 'pass',
           ),
         );
+
+        // Verify the client is created and exposes the expected interface.
+        expect(client.connectionState, isA<Stream<ConnectionState>>());
       });
 
       test('configures TLS correctly when enabled', () {
