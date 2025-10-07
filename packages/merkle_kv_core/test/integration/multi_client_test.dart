@@ -88,12 +88,12 @@ void main() {
       final config1 = TestConfigurations.mosquittoBasic(
         clientId: 'router-client-1',
         nodeId: 'router-node-1', 
-      );
+      ).copyWith(replicationCanPublishEvents: true);
       
       final config2 = TestConfigurations.mosquittoBasic(
         clientId: 'router-client-2',
         nodeId: 'router-node-2',
-      );
+      ).copyWith(replicationCanPublishEvents: true);
       
       final mqttClient1 = MqttClientImpl(config1);
       final mqttClient2 = MqttClientImpl(config2);

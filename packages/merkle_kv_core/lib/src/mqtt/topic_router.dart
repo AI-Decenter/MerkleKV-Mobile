@@ -6,6 +6,7 @@ import 'connection_state.dart';
 import 'mqtt_client_interface.dart';
 import 'topic_scheme.dart';
 import 'topic_validator.dart';
+import 'topic_authorization.dart';
 
 /// Abstract interface for topic-based message routing.
 ///
@@ -47,6 +48,7 @@ abstract class TopicRouter {
 /// Provides topic management with validation, QoS enforcement, and automatic
 /// re-subscription after reconnection events.
 class TopicRouterImpl implements TopicRouter {
+  final MerkleKVConfig _config;
   final MqttClientInterface _mqttClient;
   final TopicScheme _topicScheme;
 
@@ -59,7 +61,8 @@ class TopicRouterImpl implements TopicRouter {
 
   /// Creates a TopicRouter with the provided configuration and MQTT client.
   TopicRouterImpl(MerkleKVConfig config, this._mqttClient)
-    : _topicScheme = TopicScheme.create(config.topicPrefix, config.clientId) {
+    : _config = config,
+      _topicScheme = TopicScheme.create(config.topicPrefix, config.clientId) {
     _initializeConnectionMonitoring();
   }
 
@@ -82,6 +85,10 @@ class TopicRouterImpl implements TopicRouter {
 
     // Re-subscribe to commands if handler is active
     if (_commandHandler != null) {
+      TopicAuthorization.checkSubscribe(
+        _config,
+        _topicScheme.commandTopic,
+      );
       await _mqttClient.subscribe(_topicScheme.commandTopic, _commandHandler!);
       developer.log(
         'Restored command subscription: ${_topicScheme.commandTopic}',
@@ -92,6 +99,10 @@ class TopicRouterImpl implements TopicRouter {
 
     // Re-subscribe to replication if handler is active
     if (_replicationHandler != null) {
+      TopicAuthorization.checkSubscribe(
+        _config,
+        _topicScheme.replicationTopic,
+      );
       await _mqttClient.subscribe(
         _topicScheme.replicationTopic,
         _replicationHandler!,
@@ -109,6 +120,10 @@ class TopicRouterImpl implements TopicRouter {
     void Function(String, String) handler,
   ) async {
     _commandHandler = handler;
+    TopicAuthorization.checkSubscribe(
+      _config,
+      _topicScheme.commandTopic,
+    );
     await _mqttClient.subscribe(_topicScheme.commandTopic, handler);
 
     developer.log(
@@ -123,6 +138,10 @@ class TopicRouterImpl implements TopicRouter {
     void Function(String, String) handler,
   ) async {
     _replicationHandler = handler;
+    TopicAuthorization.checkSubscribe(
+      _config,
+      _topicScheme.replicationTopic,
+    );
     await _mqttClient.subscribe(_topicScheme.replicationTopic, handler);
 
     developer.log(
@@ -140,12 +159,11 @@ class TopicRouterImpl implements TopicRouter {
       targetClientId,
     );
 
-    await _mqttClient.publish(
+    TopicAuthorization.checkPublish(
+      _config,
       targetTopic,
-      payload,
-      forceQoS1: true,
-      forceRetainFalse: true,
     );
+    await _mqttClient.publish(targetTopic, payload, forceQoS1: true, forceRetainFalse: true);
 
     developer.log(
       'Published command to $targetTopic (${payload.length} bytes)',
@@ -156,12 +174,11 @@ class TopicRouterImpl implements TopicRouter {
 
   @override
   Future<void> publishResponse(String payload) async {
-    await _mqttClient.publish(
+    TopicAuthorization.checkPublish(
+      _config,
       _topicScheme.responseTopic,
-      payload,
-      forceQoS1: true,
-      forceRetainFalse: true,
     );
+    await _mqttClient.publish(_topicScheme.responseTopic, payload, forceQoS1: true, forceRetainFalse: true);
 
     developer.log(
       'Published response to ${_topicScheme.responseTopic} (${payload.length} bytes)',
@@ -172,12 +189,11 @@ class TopicRouterImpl implements TopicRouter {
 
   @override
   Future<void> publishReplication(String payload) async {
-    await _mqttClient.publish(
+    TopicAuthorization.checkPublish(
+      _config,
       _topicScheme.replicationTopic,
-      payload,
-      forceQoS1: true,
-      forceRetainFalse: true,
     );
+    await _mqttClient.publish(_topicScheme.replicationTopic, payload, forceQoS1: true, forceRetainFalse: true);
 
     developer.log(
       'Published replication to ${_topicScheme.replicationTopic} (${payload.length} bytes)',

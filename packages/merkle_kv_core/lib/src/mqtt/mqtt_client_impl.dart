@@ -8,6 +8,7 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 
 import '../config/merkle_kv_config.dart';
 import '../config/mqtt_security_config.dart';
+import 'topic_authorization.dart';
 import 'connection_state.dart';
 import 'mqtt_client_interface.dart';
 
@@ -354,6 +355,14 @@ class MqttClientImpl implements MqttClientInterface {
     bool forceQoS1 = true,
     bool forceRetainFalse = true,
   }) async {
+    try {
+      TopicAuthorization.checkPublish(_config, topic);
+    } catch (e) {
+      if (e is AuthorizationException) {
+        throw Exception(e.message);
+      }
+      rethrow;
+    }
     final message = _QueuedMessage(
       topic: topic,
       payload: payload,
@@ -398,6 +407,14 @@ class MqttClientImpl implements MqttClientInterface {
     String topic,
     void Function(String, String) handler,
   ) async {
+    try {
+      TopicAuthorization.checkSubscribe(_config, topic);
+    } catch (e) {
+      if (e is AuthorizationException) {
+        throw Exception(e.message);
+      }
+      rethrow;
+    }
     final handlers =
         _subscriptions.putIfAbsent(topic, () => <void Function(String, String)>[]);
     handlers.add(handler);

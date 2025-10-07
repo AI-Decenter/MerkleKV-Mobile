@@ -90,6 +90,10 @@ class MerkleKVConfig {
 
   /// Optional MQTT security configuration (TLS and authentication details).
   final MqttSecurityConfig? mqttSecurity;
+  /// Whether this client can publish replication events to {prefix}/replication/events.
+  final bool replicationCanPublishEvents;
+  /// Whether this client can subscribe to replication events topic.
+  final bool replicationCanSubscribeEvents;
 
   /// Static security warning handler for non-TLS credential usage.
   static void Function(String message)? _onSecurityWarning;
@@ -114,6 +118,8 @@ class MerkleKVConfig {
     required this.batteryConfig,
     required this.resourceLimits,
     required this.mqttSecurity,
+    required this.replicationCanPublishEvents,
+    required this.replicationCanSubscribeEvents,
   });
 
   /// Creates a new fluent builder for constructing a configuration.
@@ -148,6 +154,8 @@ class MerkleKVConfig {
     BatteryAwarenessConfig? batteryConfig,
     ResourceLimits? resourceLimits,
     MqttSecurityConfig? mqttSecurity,
+    bool replicationCanPublishEvents = false,
+    bool replicationCanSubscribeEvents = true,
   }) {
     return MerkleKVConfig._validated(
       mqttHost: mqttHost,
@@ -168,6 +176,8 @@ class MerkleKVConfig {
       batteryConfig: batteryConfig ?? const BatteryAwarenessConfig(),
       resourceLimits: resourceLimits,
       mqttSecurity: mqttSecurity,
+      replicationCanPublishEvents: replicationCanPublishEvents,
+      replicationCanSubscribeEvents: replicationCanSubscribeEvents,
     );
   }
 
@@ -215,6 +225,8 @@ class MerkleKVConfig {
     BatteryAwarenessConfig? batteryConfig,
     ResourceLimits? resourceLimits,
     MqttSecurityConfig? mqttSecurity,
+    bool replicationCanPublishEvents = false,
+    bool replicationCanSubscribeEvents = true,
   }) {
     // Auto-supply temp storage path if persistence enabled but no path provided
     String? resolvedStoragePath = storagePath;
@@ -243,6 +255,8 @@ class MerkleKVConfig {
       batteryConfig: batteryConfig ?? const BatteryAwarenessConfig(),
       resourceLimits: resourceLimits,
       mqttSecurity: mqttSecurity,
+      replicationCanPublishEvents: replicationCanPublishEvents,
+      replicationCanSubscribeEvents: replicationCanSubscribeEvents,
     );
   }
 
@@ -266,6 +280,8 @@ class MerkleKVConfig {
     required BatteryAwarenessConfig batteryConfig,
     ResourceLimits? resourceLimits,
     MqttSecurityConfig? mqttSecurity,
+    bool replicationCanPublishEvents = false,
+    bool replicationCanSubscribeEvents = true,
   }) {
     // Validate mqttHost
     if (mqttHost.trim().isEmpty) {
@@ -401,6 +417,8 @@ class MerkleKVConfig {
       batteryConfig: batteryConfig,
       resourceLimits: resourceLimits,
       mqttSecurity: mqttSecurity,
+      replicationCanPublishEvents: replicationCanPublishEvents,
+      replicationCanSubscribeEvents: replicationCanSubscribeEvents,
     );
   }
 
@@ -437,6 +455,8 @@ class MerkleKVConfig {
     BatteryAwarenessConfig? batteryConfig,
     ResourceLimits? resourceLimits,
     MqttSecurityConfig? mqttSecurity,
+    bool? replicationCanPublishEvents,
+    bool? replicationCanSubscribeEvents,
   }) {
     // If TLS setting changes but port is not specified, infer the port
     final newTlsSetting = mqttUseTls ?? this.mqttUseTls;
@@ -467,6 +487,8 @@ class MerkleKVConfig {
       batteryConfig: batteryConfig ?? this.batteryConfig,
       resourceLimits: resourceLimits ?? this.resourceLimits,
       mqttSecurity: mqttSecurity ?? this.mqttSecurity,
+      replicationCanPublishEvents: replicationCanPublishEvents ?? this.replicationCanPublishEvents,
+      replicationCanSubscribeEvents: replicationCanSubscribeEvents ?? this.replicationCanSubscribeEvents,
     );
   }
 
@@ -498,6 +520,8 @@ class MerkleKVConfig {
       },
       'resourceLimits': resourceLimits?.toJson(),
       'mqttSecurity': mqttSecurity?.toJson(),
+      'replicationCanPublishEvents': replicationCanPublishEvents,
+      'replicationCanSubscribeEvents': replicationCanSubscribeEvents,
     };
   }
 
@@ -564,6 +588,8 @@ class MerkleKVConfig {
               (json['resourceLimits'] as Map).cast<String, dynamic>(),
             ),
       mqttSecurity: security,
+      replicationCanPublishEvents: json['replicationCanPublishEvents'] as bool? ?? false,
+      replicationCanSubscribeEvents: json['replicationCanSubscribeEvents'] as bool? ?? true,
     );
   }
 
@@ -596,6 +622,8 @@ class MerkleKVConfig {
           'reduceBackgroundActivity: ${batteryConfig.reduceBackgroundActivity}), '
         'resourceLimits: ${resourceLimits?.toString()}, '
         'mqttSecurity: ${mqttSecurity?.toJson()}'
+        ', replicationCanPublishEvents: $replicationCanPublishEvents'
+        ', replicationCanSubscribeEvents: $replicationCanSubscribeEvents'
         '}';
   }
 }
