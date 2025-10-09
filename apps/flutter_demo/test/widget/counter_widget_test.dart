@@ -4,15 +4,15 @@ import 'package:flutter_demo/main.dart';
 
 void main() {
   group('MerkleKV Demo App Widget Tests', () {
-    testWidgets('App renders title and dashboard banner correctly',
+    testWidgets('App renders title and description correctly',
         (WidgetTester tester) async {
       // Build our app and trigger a frame.
       await tester.pumpWidget(const MyApp());
 
       // Verify that the app title is displayed.
       expect(find.text('MerkleKV Mobile Demo'), findsWidgets);
-      // Dashboard headline is visible
-      expect(find.text('Live System Dashboard'), findsOneWidget);
+      expect(find.text('Package structure initialized successfully!'),
+          findsOneWidget);
     });
 
     testWidgets('AppBar displays correct title', (WidgetTester tester) async {
@@ -29,14 +29,18 @@ void main() {
           findsOneWidget);
     });
 
-    testWidgets('Main content contains dashboard and log console',
+    testWidgets('Main content is centered correctly',
         (WidgetTester tester) async {
       // Build our app and trigger a frame.
       await tester.pumpWidget(const MyApp());
 
-      // Verify dashboard and console sections are present
-      expect(find.text('Live System Dashboard'), findsOneWidget);
-      expect(find.text('Connection Log'), findsOneWidget);
+      // Verify that content is properly centered
+      expect(find.byType(Center), findsOneWidget);
+      expect(find.byType(Column), findsOneWidget);
+
+      // Find the Column widget and verify its mainAxisAlignment
+      final Column column = tester.widget(find.byType(Column));
+      expect(column.mainAxisAlignment, MainAxisAlignment.center);
     });
 
     testWidgets('App uses correct theme', (WidgetTester tester) async {
@@ -58,10 +62,15 @@ void main() {
       expect(find.byType(AppBar), findsOneWidget);
 
       // Verify body contains the expected widgets
-      expect(find.byType(SafeArea), findsOneWidget);
+      expect(
+          find.descendant(
+            of: find.byType(Scaffold),
+            matching: find.byType(Center),
+          ),
+          findsOneWidget);
     });
 
-    testWidgets('Text widgets include key labels',
+    testWidgets('Text widgets have correct styles',
         (WidgetTester tester) async {
       // Build our app and trigger a frame.
       await tester.pumpWidget(const MyApp());
@@ -71,7 +80,8 @@ void main() {
 
       // Verify that we have the expected text content
       expect(find.text('MerkleKV Mobile Demo'), findsWidgets);
-      expect(find.text('Connection Log'), findsOneWidget);
+      expect(find.text('Package structure initialized successfully!'),
+          findsOneWidget);
     });
 
     testWidgets('App can be rebuilt without errors',
@@ -85,7 +95,8 @@ void main() {
 
       // Verify everything still works after rebuild
       expect(find.text('MerkleKV Mobile Demo'), findsWidgets);
-      expect(find.text('Connection Log'), findsOneWidget);
+      expect(find.text('Package structure initialized successfully!'),
+          findsOneWidget);
     });
 
     testWidgets('Widget tree structure is correct',

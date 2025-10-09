@@ -8,7 +8,6 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 
 import '../config/merkle_kv_config.dart';
 import '../config/mqtt_security_config.dart';
-import 'connection_logger.dart';
 import 'connection_state.dart';
 import 'mqtt_client_interface.dart';
 
@@ -19,7 +18,6 @@ import 'mqtt_client_interface.dart';
 class MqttClientImpl implements MqttClientInterface {
   final MerkleKVConfig _config;
   late final MqttServerClient _client;
-  late final ConnectionLogger _logger;
   final StreamController<ConnectionState> _connectionStateController =
       StreamController<ConnectionState>.broadcast();
   final List<_QueuedMessage> _messageQueue = [];
@@ -34,8 +32,7 @@ class MqttClientImpl implements MqttClientInterface {
   String? _lastTlsError;
 
   /// Creates an MQTT client implementation with the provided configuration.
-  MqttClientImpl(this._config, {ConnectionLogger? logger}) {
-    _logger = logger ?? StreamConnectionLogger(tag: 'MQTT-Core');
+  MqttClientImpl(this._config) {
     _initializeClient();
   }
 
@@ -125,7 +122,6 @@ class MqttClientImpl implements MqttClientInterface {
     _client.onDisconnected = _onDisconnected;
     _client.onSubscribed = _onSubscribed;
     _client.onUnsubscribed = _onUnsubscribed;
-    _logger.info('MQTT client initialized');
 
     // Message handler will be attached on successful connection in _onConnected.
   }
@@ -155,13 +151,11 @@ class MqttClientImpl implements MqttClientInterface {
     }
 
     _updateConnectionState(ConnectionState.connecting);
-    _logger.info('🌐 Connecting to ${_config.mqttHost}:${_config.mqttPort} (tls=${_config.mqttUseTls}, clientId=${_config.clientId})');
 
     try {
       await _attemptConnection();
       _reconnectAttempts = 0; // Reset on successful connection
     } catch (e) {
-      _logger.error('❌ Connect attempt failed; scheduling reconnect', e is Exception ? e : Exception(e.toString()));
       _updateConnectionState(ConnectionState.disconnected);
       _scheduleReconnect();
       rethrow;
@@ -346,7 +340,6 @@ class MqttClientImpl implements MqttClientInterface {
   Future<void> disconnect({bool suppressLWT = true}) async {
     _reconnectTimer?.cancel();
     _updateConnectionState(ConnectionState.disconnecting);
-    _logger.info('🔌 Disconnecting (suppressLWT=$suppressLWT)');
 
     if (suppressLWT) {
       // Clear LWT before disconnecting for graceful shutdown
@@ -355,7 +348,6 @@ class MqttClientImpl implements MqttClientInterface {
 
     _client.disconnect();
     _updateConnectionState(ConnectionState.disconnected);
-    _logger.info('🛑 Disconnected');
   }
 
   @override
@@ -375,7 +367,6 @@ class MqttClientImpl implements MqttClientInterface {
     if (_currentState != ConnectionState.connected) {
       // Queue message for later delivery
       _messageQueue.add(message);
-      _logger.warn('⏳ Queued publish to $topic (${payload.length} bytes); not connected');
       return;
     }
 
@@ -387,7 +378,6 @@ class MqttClientImpl implements MqttClientInterface {
     final builder = MqttClientPayloadBuilder();
     builder.addString(message.payload);
 
-    _logger.info('→ PUB ${message.topic} (${message.payload.length} bytes, qos=${message.qos.index}, retain=${message.retain})');
     _client.publishMessage(
       message.topic,
       message.qos,
@@ -401,7 +391,6 @@ class MqttClientImpl implements MqttClientInterface {
     final messages = List<_QueuedMessage>.from(_messageQueue);
     _messageQueue.clear();
 
-    _logger.info('📤 Flushing ${messages.length} queued message(s)');
     for (final message in messages) {
       _publishMessage(message);
     }
@@ -419,12 +408,15 @@ class MqttClientImpl implements MqttClientInterface {
     if (_currentState == ConnectionState.connected) {
       // Only subscribe at broker level the first time this topic filter is added
       if (handlers.length == 1) {
-        _logger.info('← SUB $topic (QoS=1)');
         final subscription = _client.subscribe(topic, MqttQos.atLeastOnce);
 
         // Log warning if broker downgrades to QoS 0
         if (subscription?.qos == MqttQos.atMostOnce) {
-          _logger.warn('⚠ Broker downgraded subscription to QoS 0 for topic: $topic');
+          // Use a proper logging framework in production
+          // ignore: avoid_print
+          print(
+            'Warning: Broker downgraded subscription to QoS 0 for topic: $topic',
+          );
         }
       }
     }
@@ -435,7 +427,6 @@ class MqttClientImpl implements MqttClientInterface {
     final removed = _subscriptions.remove(topic);
 
     if (_currentState == ConnectionState.connected && removed != null) {
-      _logger.info('✖ UNSUB $topic');
       _client.unsubscribe(topic);
     }
   }
@@ -443,7 +434,6 @@ class MqttClientImpl implements MqttClientInterface {
   /// Handle successful connection.
   void _onConnected() {
     _updateConnectionState(ConnectionState.connected);
-    _logger.info('✅ MQTT connected');
     // Attach updates listener once connected (updates may be null before connect)
     _updatesSubscription ??= _client.updates?.listen(_onMessageReceived);
     _reestablishSubscriptions();
@@ -455,14 +445,12 @@ class MqttClientImpl implements MqttClientInterface {
     if (_currentState != ConnectionState.disconnecting) {
       // Unexpected disconnection - schedule reconnect
       _updateConnectionState(ConnectionState.disconnected);
-      _logger.warn('🔄 Disconnected unexpectedly; scheduling reconnect');
       _scheduleReconnect();
     }
   }
 
   /// Re-establish subscriptions after reconnection.
   void _reestablishSubscriptions() {
-    _logger.info('🔁 Re-establishing ${_subscriptions.length} subscription(s)');
     for (final topic in _subscriptions.keys) {
       _client.subscribe(topic, MqttQos.atLeastOnce);
     }
@@ -470,12 +458,12 @@ class MqttClientImpl implements MqttClientInterface {
 
   /// Handle subscription confirmation.
   void _onSubscribed(String topic) {
-    _logger.info('✔ SUBACK $topic');
+    // Subscription confirmed
   }
 
   /// Handle unsubscription confirmation.
   void _onUnsubscribed(String? topic) {
-    _logger.info('✖ UNSUBACK ${topic ?? '(null)'}');
+    // Unsubscription confirmed
   }
 
   /// Handle incoming messages.
@@ -486,7 +474,6 @@ class MqttClientImpl implements MqttClientInterface {
       final payload = MqttPublishPayload.bytesToStringAsString(
         message.payload.message,
       );
-      _logger.debug('← PUBLISH $topic (${payload.length} bytes)');
 
       // Dispatch to all handlers whose subscription filter matches this topic
       // Supports MQTT wildcards: '+' (single level) and '#' (multi-level at end)
@@ -494,11 +481,7 @@ class MqttClientImpl implements MqttClientInterface {
         if (_topicMatches(filter, topic)) {
           // Copy to avoid concurrent modification if a handler unsubscribes
           for (final handler in List.from(handlers)) {
-            try {
-              handler(topic, payload);
-            } catch (e, st) {
-              _logger.error('Handler error on $topic', e is Exception ? e : Exception(e.toString()), st);
-            }
+            handler(topic, payload);
           }
         }
       });

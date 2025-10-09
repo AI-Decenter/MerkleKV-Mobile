@@ -1,8 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'widgets/system_stats_panel.dart';
-import 'widgets/rich_console_view.dart';
-import 'package:merkle_kv_core/merkle_kv_core.dart';
 
 void main() {
   runApp(const MyApp());
@@ -32,158 +28,17 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  late final StreamConnectionLogger _logger;
-
-  @override
-  void initState() {
-    super.initState();
-    _logger = StreamConnectionLogger(tag: 'Dashboard', mirrorToConsole: false);
-    // Seed some demo logs to visualize console quickly
-    Future.microtask(() {
-      _logger.info('Welcome to MerkleKV Mobile');
-      _logger.debug('Boot sequence initialized');
-      _logger.warn('Battery saver active; background sync paused');
-      _logger.error('Handshake failed (demo)', Exception('certificate expired'));
-    });
-  }
-
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: Semantics(label: 'MerkleKV Mobile Demo', child: Text(widget.title)),
-          actions: const [
-            Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.bolt, color: Colors.amber),
-            ),
-          ],
+        appBar: AppBar(title: Text(widget.title)),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Text('MerkleKV Mobile Demo', style: TextStyle(fontSize: 24)),
+              Text('Package structure initialized successfully!'),
+            ],
+          ),
         ),
-        body: SizedBox.expand(
-          child: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF0f2027), Color(0xFF203a43), Color(0xFF2c5364)],
-            ),
-          ),
-          position: DecorationPosition.background,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.dashboard_customize, color: Colors.cyanAccent),
-                      SizedBox(width: 8),
-                      Text('Live System Dashboard', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // System stats
-                  Expanded(
-                    flex: 1,
-                    child: Builder(builder: (context) {
-                      final bool isUnderTest = const bool.fromEnvironment('FLUTTER_TEST') ||
-                          WidgetsBinding.instance.runtimeType.toString().contains('TestWidgetsFlutterBinding');
-                      if (isUnderTest) {
-                        return Align(
-                          alignment: Alignment.topLeft,
-                          child: SizedBox(
-                            width: 320,
-                            child: SystemStatsPanel(
-                              refreshInterval: const Duration(seconds: 1),
-                              storageDir: Directory.systemTemp,
-                              autoRefresh: false,
-                            ),
-                          ),
-                        );
-                      }
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            SystemStatsPanel(
-                              refreshInterval: const Duration(seconds: 1),
-                              storageDir: Directory.systemTemp, // demo dir
-                              autoRefresh: true, // normal app run keeps refreshing
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  // Vibrant log console
-                  Expanded(
-                    flex: 1,
-                    child: Builder(builder: (context) {
-                      final bool isUnderTest = const bool.fromEnvironment('FLUTTER_TEST') ||
-                          WidgetsBinding.instance.runtimeType.toString().contains('TestWidgetsFlutterBinding');
-                      const Row header = Row(
-                        children: [
-                          Icon(Icons.terminal, color: Colors.greenAccent),
-                          SizedBox(width: 8),
-                          Text('Connection Log', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        ],
-                      );
-                      if (isUnderTest) {
-                        return DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                header,
-                                const SizedBox(height: 8),
-                                const Expanded(
-                                  child: Center(
-                                    child: Text(
-                                      'Log view disabled in tests',
-                                      style: TextStyle(color: Colors.white70),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                      return DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              header,
-                              const SizedBox(height: 8),
-                              Expanded(
-                                child: RichConsoleView(
-                                  logger: _logger,
-                                  levels: const {'DEBUG', 'INFO', 'WARN', 'ERROR'},
-                                  tag: 'Dashboard',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        )),
       );
 }

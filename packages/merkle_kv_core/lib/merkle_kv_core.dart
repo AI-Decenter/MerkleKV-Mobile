@@ -26,7 +26,6 @@ export 'src/mqtt/topic_router.dart';
 export 'src/mqtt/connection_lifecycle.dart';
 export 'src/mqtt/battery_aware_lifecycle.dart';
 export 'src/mqtt/connection_logger.dart';
-export 'src/mqtt/log_entry.dart';
 export 'src/mqtt/topic_validator.dart';
 
 // Commands and Correlation

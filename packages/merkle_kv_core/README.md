@@ -71,51 +71,6 @@ final value = await client.get('user:123');
 await client.delete('user:123');
 ```
 
-### Streaming Logger + Flutter Console
-
-Stream richly formatted connection logs to both console and UI.
-
-Basic wiring:
-
-```dart
-import 'package:merkle_kv_core/merkle_kv_core.dart';
-
-final config = MerkleKVConfig(
-  mqttHost: 'broker.example.com',
-  clientId: 'app-instance-1',
-  nodeId: 'mobile-device-1',
-);
-
-// Mirror to console (ANSI colors), and expose a broadcast stream for UIs
-final logger = StreamConnectionLogger(tag: 'MQTT-Core', mirrorToConsole: true);
-
-final mqtt = MqttClientImpl(config, logger: logger);
-final lifecycle = DefaultConnectionLifecycleManager(
-  config: config,
-  mqttClient: mqtt,
-  logger: logger, // optional, defaults to a streaming logger
-);
-
-await lifecycle.connect();
-```
-
-Flutter rendering with StreamBuilder:
-
-```dart
-StreamBuilder<ConnectionLogEntry>(
-  stream: logger.filtered(levels: {'DEBUG','INFO','WARN','ERROR'}, tag: 'MQTT-Core'),
-  builder: (context, snapshot) {
-    if (!snapshot.hasData) return const SizedBox.shrink();
-    final e = snapshot.data!;
-    return Text('[${e.level}] ${e.message}');
-  },
-)
-```
-
-Tip: Set `mirrorToConsole: false` for a UI-only logger (no stdout output).
-
-The demo app includes a ready-to-use Flutter widget `RichConsoleView` that renders a colorful, filterable console from `logger.stream` with a Clear button.
-
 ### Builder Pattern (recommended)
 
 ```dart

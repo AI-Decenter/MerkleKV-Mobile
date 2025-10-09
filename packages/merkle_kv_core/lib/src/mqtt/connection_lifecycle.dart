@@ -147,7 +147,7 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
   })  : _config = config,
         _mqttClient = mqttClient,
         _metrics = metrics,
-  _logger = logger ?? StreamConnectionLogger(tag: 'Lifecycle'),
+        _logger = logger ?? const DefaultConnectionLogger(),
         _disconnectionTimeout = disconnectionTimeout ?? const Duration(seconds: 10),
         _maintainConnectionInBackground = maintainConnectionInBackground {
     _initializeStateMonitoring();
@@ -183,7 +183,7 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
       return;
     }
 
-  _logger.info('🚀 Starting connection to ${_config.mqttHost}:${_config.mqttPort} (clientId=${_config.clientId})');
+    _logger.info('Starting connection to ${_config.mqttHost}:${_config.mqttPort}');
     _connectionStartTime = DateTime.now();
     
     _updateState(
@@ -201,8 +201,8 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
         },
       );
       
-  final duration = DateTime.now().difference(_connectionStartTime!);
-  _logger.info('✅ Connected in ${duration.inMilliseconds}ms');
+      final duration = DateTime.now().difference(_connectionStartTime!);
+      _logger.info('Connected successfully in ${duration.inMilliseconds}ms');
       
       _metrics?.recordConnectionLifecycleEvent('connection_established');
       _metrics?.recordConnectionDurationMetric(duration.inSeconds.toDouble());
@@ -212,8 +212,8 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
         reason: 'Connection established successfully',
       );
     } catch (e) {
-  final reason = _categorizeConnectionError(e);
-  _logger.error('❌ Connection failed: $reason', e);
+      final reason = _categorizeConnectionError(e);
+      _logger.error('Connection failed: $reason', e);
       
       _metrics?.recordConnectionLifecycleEvent('connection_failed');
       _metrics?.recordDisconnectionReasonMetric(reason);
@@ -235,7 +235,7 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
       return;
     }
 
-  _logger.info('🔌 Starting graceful disconnection (suppressLWT: $suppressLWT)');
+    _logger.info('Starting graceful disconnection (suppressLWT: $suppressLWT)');
     
     _updateState(
       ConnectionState.disconnecting,
@@ -253,14 +253,14 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
       await _performResourceCleanup();
       
       if (suppressLWT) {
-  _logger.debug('🛡️ Suppressing Last Will and Testament');
+        _logger.debug('Suppressing Last Will and Testament');
         _metrics?.recordConnectionLifecycleEvent('lwt_suppressed');
       }
 
       await _mqttClient.disconnect(suppressLWT: suppressLWT);
       _disconnectionTimeoutTimer?.cancel();
       
-  _logger.info('🛑 Disconnected successfully');
+      _logger.info('Disconnected successfully');
       _metrics?.recordConnectionLifecycleEvent('disconnection_completed');
       _metrics?.recordDisconnectionReasonMetric(DisconnectionReason.manual);
       
@@ -271,7 +271,7 @@ class DefaultConnectionLifecycleManager implements ConnectionLifecycleManager {
     } catch (e) {
       _disconnectionTimeoutTimer?.cancel();
       
-  _logger.error('⚠️ Disconnection error', e);
+      _logger.error('Disconnection error', e);
       _metrics?.recordConnectionLifecycleEvent('disconnection_failed');
       
       // Force state to disconnected even on error
