@@ -1,0 +1,53 @@
+name: Windows SFX (single-file EXE)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*', 'v*' ]
+
+jobs:
+  build-sfx:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+        shell: bash
+
+      - name: Ensure 7-Zip present
+        shell: powershell
+        run: |
+          if (-not (Test-Path "$env:ProgramFiles\7-Zip\7zS.sfx")) {
+            choco install 7zip -y
+          }
+
+      - name: Build and package SFX
+        shell: powershell
+        run: |
+          ./scripts/windows/make-sfx.ps1 -Output "$pwd/apps/flutter_demo/releases/MerkleKV-Mobile.exe"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MerkleKV-Mobile-windows-sfx
+          path: apps/flutter_demo/releases/MerkleKV-Mobile.exe
+          if-no-files-found: error
+
+      - name: Upload release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            apps/flutter_demo/releases/MerkleKV-Mobile.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

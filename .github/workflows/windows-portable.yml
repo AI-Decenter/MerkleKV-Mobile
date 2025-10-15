@@ -1,0 +1,58 @@
+name: windows-portable
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/flutter_demo/**'
+      - 'packages/**'
+      - '.github/workflows/windows-portable.yml'
+      - 'scripts/windows/make-sfx.ps1'
+
+jobs:
+  build-windows:
+    name: Build Windows portable EXE
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter doctor
+        shell: bash
+        run: flutter doctor -v
+
+      - name: Enable Windows desktop
+        shell: bash
+        run: flutter config --enable-windows-desktop
+
+      - name: Install 7-Zip
+        shell: powershell
+        run: choco install -y 7zip
+
+      - name: Build portable EXE
+        shell: pwsh
+        run: |
+          & ./scripts/windows/make-sfx.ps1
+
+      - name: Collect artifact
+        shell: pwsh
+        run: |
+          $release = Resolve-Path 'apps/flutter_demo/releases/windows'
+          Write-Host "Release dir: $release"
+          Get-ChildItem $release -Recurse
+        continue-on-error: true
+
+      - name: Upload portable EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter_demo-windows-portable
+          path: apps/flutter_demo/releases/windows/*.exe
+          if-no-files-found: error
